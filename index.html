@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Domo · Quote Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --primary: #3652A5;
+  --dark: #142543;
+  --teal: #8BD7D7;
+  --lime: #D6E264;
+  --periwinkle: #80A2F9;
+  --off-white: #f7f8fc;
+  --cream: #eef1f8;
+  --red: #c0392b;
+  --mid: #7a8aaa;
+  --border: #e2e7f0;
+  --card: #ffffff;
+  --sidebar-w: 230px;
+  --green: #2d6a4f;
+  --green-light: #52b788;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: var(--dark); min-height: 100vh; display: flex; }
+
+/* SIDEBAR */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--dark);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 0;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+}
+.logo { padding: 0 24px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.logo img { width: 100%; max-width: 150px; display: block; filter: brightness(0) invert(1); }
+.logo-sub { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--teal); letter-spacing: 2px; text-transform: uppercase; margin-top: 8px; }
+.nav { padding: 24px 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px; color: rgba(255,255,255,0.5);
+  font-size: 13.5px; font-weight: 500; cursor: pointer;
+  transition: all 0.15s; border-left: 3px solid transparent; user-select: none;
+}
+.nav-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); }
+.nav-item.active { color: var(--teal); border-left-color: var(--teal); background: rgba(139,215,215,0.08); }
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.nav-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 8px 24px; }
+.sidebar-user { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.08); }
+.sidebar-user-name { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; }
+.sidebar-user-logout { font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; margin-top: 3px; }
+.sidebar-user-logout:hover { color: var(--teal); }
+
+/* MAIN */
+#main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px; max-width: calc(100vw - var(--sidebar-w)); }
+.page { display: none; }
+.page.active { display: block; }
+
+/* PAGE HEADER */
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
+.page-title { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; color: var(--dark); letter-spacing: -0.5px; }
+.page-sub { font-size: 13px; color: var(--mid); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+.btn-primary { background: var(--primary); color: white; }
+.btn-primary:hover { background: var(--dark); }
+.btn-amber { background: var(--primary); color: white; font-weight: 700; }
+.btn-amber:hover { background: var(--dark); }
+.btn-ghost { background: transparent; color: var(--dark); border: 1.5px solid var(--border); }
+.btn-ghost:hover { background: var(--cream); }
+.btn-danger { background: #fce8e6; color: var(--red); border: 1.5px solid #f5c6c2; }
+.btn-danger:hover { background: #f9d5d2; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-green { background: var(--green); color: white; }
+.btn-green:hover { background: #235a40; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* CARDS */
+.card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 24px; }
+.card + .card { margin-top: 16px; }
+
+/* FORM */
+.form-row { display: grid; gap: 16px; margin-bottom: 16px; }
+.form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+.form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: 12px; font-weight: 600; color: var(--mid); text-transform: uppercase; letter-spacing: 0.5px; }
+.form-input, .form-select, .form-textarea { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 14px; font-family: 'DM Sans', sans-serif; background: white; color: var(--dark); transition: border-color 0.15s; outline: none; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--primary); }
+.form-textarea { resize: vertical; min-height: 80px; }
+
+/* SECTION TITLE */
+.section-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--dark); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* LINE ITEMS TABLE */
+.line-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.line-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--mid); text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px; border-bottom: 1.5px solid var(--border); background: var(--off-white); }
+.line-table td { padding: 8px 10px; border-bottom: 1px solid #e8eef8; vertical-align: middle; }
+.line-table tr:last-child td { border-bottom: none; }
+.line-table tr:hover td { background: #f5f8ff; }
+.line-table input, .line-table select { border: 1.5px solid transparent; border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: 'DM Sans', sans-serif; background: transparent; width: 100%; outline: none; transition: border-color 0.15s; }
+.line-table input:focus, .line-table select:focus { border-color: var(--primary); background: white; }
+.cat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
+.cat-labor { background: #e6ecf8; color: var(--primary); }
+.cat-materials { background: #e8f5e9; color: #2e7d32; }
+.cat-equipment { background: #fff3e0; color: #e65100; }
+
+/* TOTALS PANEL */
+.totals-panel { background: var(--dark); color: white; border-radius: 12px; padding: 24px; min-width: 280px; }
+.totals-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--teal); margin-bottom: 16px; letter-spacing: 1px; text-transform: uppercase; }
+.totals-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13.5px; color: rgba(255,255,255,0.6); }
+.totals-row.total { border-top: 1px solid rgba(255,255,255,0.12); margin-top: 8px; padding-top: 12px; font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--teal); }
+.totals-row.total span:first-child { font-size: 13px; color: rgba(255,255,255,0.35); font-family: 'DM Mono', monospace; }
+.margin-controls { margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+.margin-label { font-size: 11px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.margin-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.margin-row label { font-size: 12.5px; color: rgba(255,255,255,0.55); }
+.margin-input { width: 60px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: white; padding: 4px 8px; font-size: 13px; font-family: 'DM Mono', monospace; text-align: right; outline: none; transition: border-color 0.15s; }
+.margin-input:focus { border-color: var(--teal); }
+
+/* TOGGLE OPTIONS */
+.toggle-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.toggle-btn { padding: 6px 14px; border-radius: 20px; font-size: 12.5px; font-weight: 500; cursor: pointer; border: 1.5px solid var(--border); background: white; color: var(--mid); transition: all 0.15s; }
+.toggle-btn.active { background: var(--dark); color: white; border-color: var(--dark); }
+
+/* QUOTE LIST */
+.quote-list { display: flex; flex-direction: column; gap: 12px; }
+.quote-card { background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 22px; display: flex; align-items: center; gap: 16px; transition: all 0.15s; }
+.quote-card:hover { border-color: var(--primary); box-shadow: 0 2px 12px rgba(54,82,165,0.1); }
+.quote-card-num { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--mid); min-width: 70px; }
+.quote-card-client { font-weight: 600; font-size: 14.5px; flex: 1; }
+.quote-card-desc { font-size: 13px; color: var(--mid); flex: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quote-card-amount { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px; color: var(--dark); min-width: 90px; text-align: right; }
+.status-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.status-draft { background: #f0ece6; color: #888; }
+.status-sent { background: #e6ecf8; color: var(--primary); }
+.status-approved { background: #e8f5e9; color: #2e7d32; }
+.status-rejected { background: #fce8e6; color: var(--red); }
+
+/* SEARCH BAR */
+.search-bar { display: flex; align-items: center; gap: 12px; background: white; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 16px; margin-bottom: 20px; }
+.search-bar input { border: none; outline: none; font-size: 14px; font-family: 'DM Sans', sans-serif; flex: 1; color: var(--dark); background: transparent; }
+.search-icon { color: var(--mid); font-size: 16px; }
+
+/* STATS ROW */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.stat-card { background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+.stat-num { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--dark); }
+.stat-label { font-size: 12px; color: var(--mid); margin-top: 4px; font-family: 'DM Mono', monospace; letter-spacing: 0.3px; }
+.stat-card.highlight .stat-num { color: var(--primary); }
+
+/* CATALOG */
+.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.catalog-item { background: white; border: 1.5px solid var(--border); border-radius: 10px; padding: 16px; transition: all 0.15s; }
+.catalog-item:hover { border-color: var(--primary); }
+.catalog-item-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.catalog-item-meta { font-size: 12px; color: var(--mid); display: flex; gap: 12px; align-items: center; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: white; border-radius: 16px; padding: 28px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; margin-bottom: 20px; color: var(--dark); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+/* TOAST */
+.toast { position: fixed; bottom: 28px; right: 28px; background: var(--dark); color: white; padding: 12px 20px; border-radius: 10px; font-size: 13.5px; font-weight: 500; z-index: 999; opacity: 0; transform: translateY(10px); transition: all 0.25s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { border-left: 4px solid var(--teal); }
+.toast.error { border-left: 4px solid var(--red); }
+
+/* SCOPE AREA */
+.scope-area { background: #f0f4ff; border: 2px dashed var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; transition: border-color 0.15s; }
+.scope-area:focus-within { border-color: var(--primary); }
+
+/* AI BUTTON */
+.ai-btn { background: linear-gradient(135deg, var(--dark), var(--primary)); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.15s; font-family: 'DM Sans', sans-serif; }
+.ai-btn:hover { opacity: 0.9; }
+.ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-badge { background: var(--teal); color: var(--dark); font-size: 9px; padding: 2px 5px; border-radius: 4px; font-weight: 800; letter-spacing: 0.5px; }
+
+/* INCLUDE TOGGLES */
+.include-row { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+.include-check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; }
+.include-check input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--mid); }
+.empty-state .emoji { font-size: 40px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+/* LOGIN PAGE */
+#login-page { min-height: 100vh; background: var(--dark); display: flex; align-items: center; justify-content: center; width: 100%; }
+.login-box { background: white; border-radius: 20px; padding: 44px; width: 400px; box-shadow: 0 30px 80px rgba(0,0,0,0.3); }
+.login-logo { margin-bottom: 8px; }
+.login-logo img { height: 44px; }
+.login-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--dark); margin-bottom: 6px; margin-top: 20px; }
+.login-sub { font-size: 13px; color: var(--mid); margin-bottom: 28px; }
+
+/* SPINNER */
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-overlay { position: fixed; inset: 0; background: rgba(20,37,67,0.6); z-index: 500; display: flex; align-items: center; justify-content: center; }
+.loading-box { background: white; border-radius: 14px; padding: 28px 36px; text-align: center; }
+.loading-box p { margin-top: 12px; font-size: 14px; color: var(--mid); }
+
+.flex { display: flex; }
+.gap-12 { gap: 12px; }
+.mt-16 { margin-top: 16px; }
+.align-start { align-items: flex-start; }
+.flex-1 { flex: 1; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png" alt="Domo" />
+    </div>
+    <div class="login-title">Quote Tool</div>
+    <div class="login-sub">Sign in to access your team's quotes</div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="login-email" placeholder="you@domoyourhome.com" />
+    </div>
+    <div class="form-group" style="margin-bottom:24px;">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-input" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')loginUser()" />
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;" onclick="loginUser()" id="login-btn">Sign In</button>
+    <div id="login-error" style="color:var(--red);font-size:13px;margin-top:12px;text-align:center;"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;width:100%;display:none;">
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="logo">
+    <img src="https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png" alt="Domo" />
+    <div class="logo-sub">Quote Tool</div>
+  </div>
+  <div class="nav">
+    <div class="nav-item active" data-page="new-quote"><span class="nav-icon">✦</span><span>New Quote</span></div>
+    <div class="nav-item" data-page="quotes"><span class="nav-icon">◈</span><span>Quotes</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" data-page="clients"><span class="nav-icon">◎</span><span>Clients</span></div>
+    <div class="nav-item" data-page="catalog"><span class="nav-icon">⊞</span><span>Catalog</span></div>
+    <div class="nav-divider"></div>
+    <div class="nav-item" data-page="settings"><span class="nav-icon">⊙</span><span>Settings</span></div>
+  </div>
+  <div class="sidebar-user">
+    <div class="sidebar-user-name" id="sidebar-username">—</div>
+    <div class="sidebar-user-logout" onclick="logoutUser()">Sign out</div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main id="main">
+
+  <!-- NEW QUOTE -->
+  <div class="page active" id="page-new-quote">
+    <div class="page-header">
+      <div>
+        <div class="page-title" id="quote-page-title">New Quote</div>
+        <div class="page-sub" id="quote-number-display">QT-0001</div>
+      </div>
+      <div class="flex gap-12">
+        <button class="btn btn-ghost" onclick="clearQuote()">↺ Clear</button>
+        <button class="btn btn-primary" id="save-draft-btn" onclick="saveQuoteDraft()">Save Draft</button>
+        <button class="btn btn-amber" onclick="openFinishModal()">Finish & Generate PDF ↗</button>
+      </div>
+    </div>
+    <div class="flex gap-12 align-start">
+      <div class="flex-1">
+        <div class="card">
+          <div class="section-title">Client Info</div>
+          <div class="form-row cols-2">
+            <div class="form-group">
+              <label class="form-label">Client Name *</label>
+              <input type="text" class="form-input" id="q-client-name" placeholder="e.g. Carlos Rivera" list="clients-datalist" />
+              <datalist id="clients-datalist"></datalist>
+            </div>
+            <div class="form-group"><label class="form-label">Phone / WhatsApp</label><input type="text" class="form-input" id="q-client-phone" placeholder="+1 787 000 0000" /></div>
+          </div>
+          <div class="form-row cols-2">
+            <div class="form-group"><label class="form-label">Email</label><input type="text" class="form-input" id="q-client-email" placeholder="email@example.com" /></div>
+            <div class="form-group"><label class="form-label">Property Address</label><input type="text" class="form-input" id="q-property" placeholder="Calle X, Municipio, PR" /></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Internal Notes (not shown on PDF)</label><input type="text" class="form-input" id="q-notes" placeholder="Job site conditions, access info, etc." /></div>
+          </div>
+        </div>
+
+        <div class="card mt-16">
+          <div class="section-title">Scope of Work</div>
+          <div class="scope-area">
+            <textarea class="form-textarea" id="q-scope" style="width:100%;border:none;background:transparent;outline:none;font-size:14px;" placeholder="Describe the work needed... e.g. 'Replace 3 interior doors, patch drywall in master bedroom approx 4x4ft, repaint bathroom ceiling'" rows="4"></textarea>
+          </div>
+          <div class="flex gap-12">
+            <button class="ai-btn" onclick="parseScope()" id="ai-parse-btn"><span>✦</span> Parse with AI <span class="ai-badge">AI</span></button>
+            <button class="btn btn-ghost" onclick="openCatalogPicker()">⊞ Add from Catalog</button>
+            <button class="btn btn-ghost btn-sm" onclick="addBlankLineItem()">+ Add Line Item</button>
+          </div>
+        </div>
+
+        <div class="card mt-16">
+          <div class="section-title">Line Items</div>
+          <div class="include-row">
+            <label class="include-check"><input type="checkbox" id="inc-materials" checked onchange="liveUpdateTotals()" /> Include Materials</label>
+            <label class="include-check"><input type="checkbox" id="inc-equipment" checked onchange="liveUpdateTotals()" /> Include Equipment</label>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="line-table">
+              <thead>
+                <tr>
+                  <th style="width:30%">Description</th>
+                  <th style="width:13%">Category</th>
+                  <th style="width:8%">Qty</th>
+                  <th style="width:8%">Unit</th>
+                  <th style="width:16%">Unit Cost</th>
+                  <th style="width:16%">Total</th>
+                  <th style="width:4%"></th>
+                </tr>
+              </thead>
+              <tbody id="line-items-body"></tbody>
+            </table>
+          </div>
+          <div id="empty-lines" class="empty-state" style="padding:30px 0;">
+            <div class="emoji">📋</div>
+            <p>No line items yet. Describe the scope and click Parse, or add manually.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOTALS -->
+      <div class="totals-panel" style="position:sticky;top:20px;">
+        <div class="totals-title">Estimate</div>
+        <div class="totals-row"><span>Labor</span><span id="t-labor">$0.00</span></div>
+        <div class="totals-row" id="tr-materials"><span>Materials</span><span id="t-materials">$0.00</span></div>
+        <div class="totals-row" id="tr-equipment"><span>Equipment</span><span id="t-equipment">$0.00</span></div>
+        <div class="totals-row"><span style="color:rgba(255,255,255,0.3)">Subtotal (cost)</span><span id="t-subtotal" style="color:rgba(255,255,255,0.35)">$0.00</span></div>
+        <div class="totals-row total"><span>TOTAL</span><span id="t-total">$0.00</span></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
+          <div class="margin-label" style="margin-bottom:6px;">Override Total (optional)</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:rgba(255,255,255,0.4);font-size:14px;">$</span>
+            <input class="margin-input" type="number" id="total-override" placeholder="e.g. 1500"
+              style="width:100%;text-align:left;" oninput="onOverrideInput()" />
+          </div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:5px;">Leave blank to use calculated total</div>
+        </div>
+        <div class="margin-controls">
+          <div class="margin-label">Margins</div>
+          <div class="margin-row"><label>Labor %</label><input class="margin-input" type="number" id="margin-labor" value="40" min="0" max="100" oninput="liveUpdateTotals()" /></div>
+          <div class="margin-row"><label>Materials %</label><input class="margin-input" type="number" id="margin-materials" value="25" min="0" max="100" oninput="liveUpdateTotals()" /></div>
+          <div class="margin-row"><label>Equipment %</label><input class="margin-input" type="number" id="margin-equipment" value="25" min="0" max="100" oninput="liveUpdateTotals()" /></div>
+        </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">
+          <div class="margin-row">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="inc-ivu" onchange="liveUpdateTotals()" style="width:15px;height:15px;accent-color:var(--teal);cursor:pointer;" />
+              IVU 11.5%
+            </label>
+            <span id="t-ivu" style="font-size:13px;color:rgba(255,255,255,0.6);">$0.00</span>
+          </div>
+          <div class="totals-row total" id="tr-total-ivu" style="display:none;margin-top:4px;"><span>TOTAL + IVU</span><span id="t-total-ivu">$0.00</span></div>
+        </div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);">
+          <div class="margin-label">Valid Until</div>
+          <input type="date" class="form-input" id="q-valid-until" style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:white;font-size:12px;" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUOTES LIST -->
+  <div class="page" id="page-quotes">
+    <div class="page-header">
+      <div><div class="page-title">Quotes</div><div class="page-sub" id="quotes-count">Loading...</div></div>
+      <button class="btn btn-amber" onclick="showPage('new-quote')">+ New Quote</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Quotes</div></div>
+      <div class="stat-card highlight"><div class="stat-num" id="stat-revenue">—</div><div class="stat-label">Approved Revenue</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-approved">—</div><div class="stat-label">Approved</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-pending">—</div><div class="stat-label">Pending</div></div>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="Search by client, description..." id="quotes-search" oninput="renderQuotesList()" />
+      <select class="form-select" id="quotes-filter" style="border:none;width:120px;font-size:13px;" onchange="renderQuotesList()">
+        <option value="">All Status</option>
+        <option value="draft">Draft</option>
+        <option value="sent">Sent</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </div>
+    <div class="quote-list" id="quotes-list"></div>
+  </div>
+
+  <!-- CLIENTS -->
+  <div class="page" id="page-clients">
+    <div class="page-header">
+      <div><div class="page-title">Clients</div><div class="page-sub" id="clients-count">Loading...</div></div>
+      <button class="btn btn-primary" onclick="openAddClientModal()">+ Add Client</button>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="Search clients..." id="clients-search" oninput="renderClientsList()" />
+    </div>
+    <div id="clients-list" class="quote-list"></div>
+  </div>
+
+  <!-- CATALOG -->
+  <div class="page" id="page-catalog">
+    <div class="page-header">
+      <div><div class="page-title">Line Item Catalog</div><div class="page-sub" id="catalog-count">Loading...</div></div>
+      <button class="btn btn-primary" onclick="openAddCatalogModal()">+ Add Item</button>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="Search catalog..." id="catalog-search" oninput="renderCatalog()" />
+      <select class="form-select" id="catalog-filter" style="border:none;width:130px;font-size:13px;" onchange="renderCatalog()">
+        <option value="">All Categories</option>
+        <option value="labor">Labor</option>
+        <option value="materials">Materials</option>
+        <option value="equipment">Equipment</option>
+      </select>
+    </div>
+    <div class="catalog-grid" id="catalog-grid"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="page-settings">
+    <div class="page-header"><div class="page-title">Settings</div></div>
+    <div class="card" style="max-width:600px;">
+      <div class="section-title">Company Branding</div>
+      <div class="form-row cols-2">
+        <div class="form-group"><label class="form-label">Company Name</label><input class="form-input" id="s-company" /></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="s-phone" /></div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="s-email" /></div>
+        <div class="form-group"><label class="form-label">Website</label><input class="form-input" id="s-website" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tagline (shown on PDF)</label><input class="form-input" id="s-tagline" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">PDF Footer Note</label><textarea class="form-textarea" id="s-footer" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="card mt-16" style="max-width:600px;">
+      <div class="section-title">Default Margins</div>
+      <div class="form-row cols-3">
+        <div class="form-group"><label class="form-label">Labor %</label><input class="form-input" id="s-margin-labor" type="number" /></div>
+        <div class="form-group"><label class="form-label">Materials %</label><input class="form-input" id="s-margin-materials" type="number" /></div>
+        <div class="form-group"><label class="form-label">Equipment %</label><input class="form-input" id="s-margin-equipment" type="number" /></div>
+      </div>
+    </div>
+    <div style="margin-top:20px;">
+      <button class="btn btn-amber" onclick="saveSettings()">Save Settings</button>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="finish-modal">
+  <div class="modal">
+    <div class="modal-title">Generate Quote PDF</div>
+    <div class="form-group" style="margin-bottom:16px;">
+      <label class="form-label">PDF Style</label>
+      <div class="toggle-group">
+        <div class="toggle-btn active" data-style="itemized" onclick="selectPdfStyle(this)">Itemized (all line items)</div>
+        <div class="toggle-btn" data-style="summary" onclick="selectPdfStyle(this)">Summary (by category)</div>
+        <div class="toggle-btn" data-style="lumpsum" onclick="selectPdfStyle(this)">Lump Sum (one total)</div>
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:16px;">
+      <label class="form-label">Quote Status</label>
+      <select class="form-select" id="finish-status">
+        <option value="draft">Draft</option>
+        <option value="sent">Sent to Client</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('finish-modal')">Cancel</button>
+      <button class="btn btn-amber" onclick="generatePDF()" id="pdf-btn">⬇ Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="catalog-modal">
+  <div class="modal">
+    <div class="modal-title">Add from Catalog</div>
+    <input type="text" class="form-input" placeholder="Search catalog items..." id="catalog-picker-search" oninput="renderCatalogPicker()" style="margin-bottom:16px;" />
+    <div id="catalog-picker-list" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('catalog-modal')">Done</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="add-client-modal">
+  <div class="modal">
+    <div class="modal-title">Add / Edit Client</div>
+    <input type="hidden" id="edit-client-id" />
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Name *</label><input class="form-input" id="ac-name" /></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="ac-phone" /></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="ac-email" /></div>
+      <div class="form-group"><label class="form-label">Type</label>
+        <select class="form-select" id="ac-type"><option>Residential</option><option>Commercial</option><option>Property Manager</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="ac-address" /></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('add-client-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClient()">Save Client</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="add-catalog-modal">
+  <div class="modal">
+    <div class="modal-title">Add / Edit Catalog Item</div>
+    <input type="hidden" id="edit-catalog-id" />
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Description *</label><input class="form-input" id="cat-desc" /></div>
+      <div class="form-group"><label class="form-label">Category</label>
+        <select class="form-select" id="cat-cat"><option value="labor">Labor</option><option value="materials">Materials</option><option value="equipment">Equipment</option></select>
+      </div>
+    </div>
+    <div class="form-row cols-3">
+      <div class="form-group"><label class="form-label">Unit Cost ($)</label><input class="form-input" type="number" id="cat-cost" value="0" /></div>
+      <div class="form-group"><label class="form-label">Default Qty</label><input class="form-input" type="number" id="cat-qty" value="1" /></div>
+      <div class="form-group"><label class="form-label">Unit</label><input class="form-input" id="cat-unit" placeholder="hr, sqft, unit..." /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('add-catalog-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCatalogItem()">Save Item</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+const SUPABASE_URL = 'https://mpgljurndbfusxtcrogr.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_eSqiIIUFZck9XFdpgE3Ctg_u3-lBI88';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let currentLineItems = [];
+let pdfStyle = 'itemized';
+let settingsCache = {};
+let catalogCache = [];
+let clientsCache = [];
+let quotesCache = [];
+let quoteCounter = 1;
+let editingQuoteId = null; // null = new quote, uuid = editing existing
+
+// ============================================================
+// AUTH
+// ============================================================
+async function loginUser() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-error');
+  err.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false;
+  btn.textContent = 'Sign In';
+  if (error) { err.textContent = error.message; return; }
+  currentUser = data.user;
+  await bootApp();
+}
+
+async function logoutUser() {
+  await sb.auth.signOut();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+  currentUser = null;
+}
+
+async function checkSession() {
+  const { data } = await sb.auth.getSession();
+  if (data.session) {
+    currentUser = data.session.user;
+    await bootApp();
+  } else {
+    document.getElementById('login-page').style.display = 'flex';
+  }
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function bootApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('sidebar-username').textContent = currentUser.email;
+  await Promise.all([loadSettings(), loadCatalog(), loadClients()]);
+  setDefaultNewQuote();
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => showPage(el.dataset.page));
+});
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  if (page === 'quotes') loadAndRenderQuotes();
+  if (page === 'clients') renderClientsList();
+  if (page === 'catalog') renderCatalog();
+  if (page === 'settings') renderSettings();
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+async function loadSettings() {
+  const { data } = await sb.from('settings').select('*');
+  if (data) data.forEach(row => { settingsCache[row.key] = row.value; });
+  quoteCounter = parseInt(settingsCache.quote_counter || '1');
+  updateQuoteNumberDisplay();
+}
+
+function renderSettings() {
+  document.getElementById('s-company').value = settingsCache.company_name || '';
+  document.getElementById('s-phone').value = settingsCache.company_phone || '';
+  document.getElementById('s-email').value = settingsCache.company_email || '';
+  document.getElementById('s-website').value = settingsCache.company_website || '';
+  document.getElementById('s-tagline').value = settingsCache.company_tagline || '';
+  document.getElementById('s-footer').value = settingsCache.pdf_footer || '';
+  document.getElementById('s-margin-labor').value = settingsCache.margin_labor || '40';
+  document.getElementById('s-margin-materials').value = settingsCache.margin_materials || '25';
+  document.getElementById('s-margin-equipment').value = settingsCache.margin_equipment || '25';
+}
+
+async function saveSettings() {
+  const updates = [
+    { key: 'company_name', value: document.getElementById('s-company').value },
+    { key: 'company_phone', value: document.getElementById('s-phone').value },
+    { key: 'company_email', value: document.getElementById('s-email').value },
+    { key: 'company_website', value: document.getElementById('s-website').value },
+    { key: 'company_tagline', value: document.getElementById('s-tagline').value },
+    { key: 'pdf_footer', value: document.getElementById('s-footer').value },
+    { key: 'margin_labor', value: document.getElementById('s-margin-labor').value },
+    { key: 'margin_materials', value: document.getElementById('s-margin-materials').value },
+    { key: 'margin_equipment', value: document.getElementById('s-margin-equipment').value },
+  ];
+  for (const u of updates) {
+    await sb.from('settings').upsert(u, { onConflict: 'key' });
+    settingsCache[u.key] = u.value;
+  }
+  toast('Settings saved!', 'success');
+}
+
+// ============================================================
+// CATALOG
+// ============================================================
+async function loadCatalog() {
+  const { data } = await sb.from('catalog').select('*').order('use_count', { ascending: false });
+  catalogCache = data || [];
+  document.getElementById('catalog-count').textContent = `${catalogCache.length} items`;
+}
+
+function renderCatalog() {
+  const q = (document.getElementById('catalog-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('catalog-filter')?.value || '';
+  const items = catalogCache.filter(c => (!q || c.description.toLowerCase().includes(q)) && (!filter || c.category === filter));
+  document.getElementById('catalog-count').textContent = `${catalogCache.length} items`;
+  const grid = document.getElementById('catalog-grid');
+  grid.innerHTML = '';
+  if (items.length === 0) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="emoji">📦</div><p>No catalog items found.</p></div>'; return; }
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'catalog-item';
+    el.innerHTML = `
+      <div class="catalog-item-name">${esc(item.description)}</div>
+      <div class="catalog-item-meta">
+        <span class="cat-badge cat-${item.category}">${item.category}</span>
+        <span>$${item.unit_cost} / ${item.unit || 'unit'}</span>
+        ${item.use_count ? `<span style="color:var(--primary);font-weight:600">×${item.use_count}</span>` : ''}
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="editCatalogItem('${item.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCatalogItem('${item.id}')">Delete</button>
+      </div>`;
+    grid.appendChild(el);
+  });
+}
+
+function openAddCatalogModal() {
+  document.getElementById('edit-catalog-id').value = '';
+  document.getElementById('cat-desc').value = '';
+  document.getElementById('cat-cost').value = '0';
+  document.getElementById('cat-qty').value = '1';
+  document.getElementById('cat-unit').value = '';
+  document.getElementById('cat-cat').value = 'labor';
+  document.getElementById('add-catalog-modal').classList.add('open');
+}
+
+function editCatalogItem(id) {
+  const item = catalogCache.find(c => c.id === id);
+  if (!item) return;
+  document.getElementById('edit-catalog-id').value = id;
+  document.getElementById('cat-desc').value = item.description;
+  document.getElementById('cat-cat').value = item.category;
+  document.getElementById('cat-cost').value = item.unit_cost;
+  document.getElementById('cat-qty').value = item.default_qty;
+  document.getElementById('cat-unit').value = item.unit || '';
+  document.getElementById('add-catalog-modal').classList.add('open');
+}
+
+async function saveCatalogItem() {
+  const desc = document.getElementById('cat-desc').value.trim();
+  if (!desc) { toast('Description required.', 'error'); return; }
+  const id = document.getElementById('edit-catalog-id').value;
+  const data = { description: desc, category: document.getElementById('cat-cat').value, unit_cost: parseFloat(document.getElementById('cat-cost').value) || 0, default_qty: parseFloat(document.getElementById('cat-qty').value) || 1, unit: document.getElementById('cat-unit').value };
+  if (id) { await sb.from('catalog').update(data).eq('id', id); }
+  else { await sb.from('catalog').insert(data); }
+  await loadCatalog();
+  closeModal('add-catalog-modal');
+  renderCatalog();
+  toast('Catalog item saved.', 'success');
+}
+
+async function deleteCatalogItem(id) {
+  if (!confirm('Delete this catalog item?')) return;
+  await sb.from('catalog').delete().eq('id', id);
+  await loadCatalog();
+  renderCatalog();
+  toast('Item deleted.', 'success');
+}
+
+// ============================================================
+// CLIENTS
+// ============================================================
+async function loadClients() {
+  const { data } = await sb.from('clients').select('*').order('name');
+  clientsCache = data || [];
+  refreshClientDatalist();
+}
+
+function refreshClientDatalist() {
+  const dl = document.getElementById('clients-datalist');
+  if (dl) dl.innerHTML = clientsCache.map(c => `<option value="${esc(c.name)}">`).join('');
+}
+
+function renderClientsList() {
+  const q = (document.getElementById('clients-search')?.value || '').toLowerCase();
+  const clients = clientsCache.filter(c => !q || c.name.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q));
+  document.getElementById('clients-count').textContent = `${clientsCache.length} clients`;
+  const list = document.getElementById('clients-list');
+  list.innerHTML = '';
+  if (clients.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">👤</div><p>No clients yet.</p></div>'; return; }
+  clients.forEach(client => {
+    const qCount = quotesCache.filter(q => q.client_name?.toLowerCase() === client.name.toLowerCase()).length;
+    const el = document.createElement('div');
+    el.className = 'quote-card';
+    el.innerHTML = `
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:14.5px;">${esc(client.name)}</div>
+        <div style="font-size:12.5px;color:var(--mid);margin-top:3px;">${esc(client.phone||'')} ${client.email ? '· '+esc(client.email) : ''}</div>
+      </div>
+      <span class="cat-badge cat-labor">${client.type || 'Residential'}</span>
+      <div style="font-size:12.5px;color:var(--mid);">${qCount} quote${qCount!==1?'s':''}</div>
+      <button class="btn btn-ghost btn-sm" onclick="editClient('${client.id}')">Edit</button>`;
+    list.appendChild(el);
+  });
+}
+
+function openAddClientModal() {
+  document.getElementById('edit-client-id').value = '';
+  ['ac-name','ac-phone','ac-email','ac-address'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('add-client-modal').classList.add('open');
+}
+
+function editClient(id) {
+  const c = clientsCache.find(c => c.id === id);
+  if (!c) return;
+  document.getElementById('edit-client-id').value = id;
+  document.getElementById('ac-name').value = c.name;
+  document.getElementById('ac-phone').value = c.phone || '';
+  document.getElementById('ac-email').value = c.email || '';
+  document.getElementById('ac-address').value = c.address || '';
+  document.getElementById('ac-type').value = c.type || 'Residential';
+  document.getElementById('add-client-modal').classList.add('open');
+}
+
+async function saveClient() {
+  const name = document.getElementById('ac-name').value.trim();
+  if (!name) { toast('Client name required.', 'error'); return; }
+  const id = document.getElementById('edit-client-id').value;
+  const data = { name, phone: document.getElementById('ac-phone').value, email: document.getElementById('ac-email').value, address: document.getElementById('ac-address').value, type: document.getElementById('ac-type').value };
+  if (id) { await sb.from('clients').update(data).eq('id', id); }
+  else { await sb.from('clients').insert(data); }
+  await loadClients();
+  closeModal('add-client-modal');
+  renderClientsList();
+  toast('Client saved.', 'success');
+}
+
+// ============================================================
+// QUOTES LIST
+// ============================================================
+async function loadAndRenderQuotes() {
+  const { data } = await sb.from('quotes').select('*').order('created_at', { ascending: false });
+  quotesCache = data || [];
+  renderQuotesList();
+  renderStats();
+}
+
+function renderStats() {
+  document.getElementById('stat-total').textContent = quotesCache.length;
+  const rev = quotesCache.filter(q => q.status === 'approved').reduce((s,q) => s + (q.grand_total || 0), 0);
+  document.getElementById('stat-revenue').textContent = '$' + (rev >= 1000 ? (rev/1000).toFixed(1)+'k' : rev.toFixed(0));
+  document.getElementById('stat-approved').textContent = quotesCache.filter(q => q.status === 'approved').length;
+  document.getElementById('stat-pending').textContent = quotesCache.filter(q => q.status === 'sent').length;
+  document.getElementById('quotes-count').textContent = `${quotesCache.length} quotes total`;
+}
+
+function renderQuotesList() {
+  const q = (document.getElementById('quotes-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('quotes-filter')?.value || '';
+  const quotes = quotesCache.filter(quote => {
+    const mQ = !q || (quote.client_name||'').toLowerCase().includes(q) || (quote.scope||'').toLowerCase().includes(q) || (quote.quote_number||'').toLowerCase().includes(q);
+    const mF = !filter || quote.status === filter;
+    return mQ && mF;
+  });
+  const list = document.getElementById('quotes-list');
+  list.innerHTML = '';
+  if (quotes.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">📄</div><p>No quotes found.</p></div>'; return; }
+  quotes.forEach(quote => {
+    const el = document.createElement('div');
+    el.className = 'quote-card';
+    el.style.cursor = 'pointer';
+    el.onclick = () => loadQuoteForEditing(quote.id);
+    el.innerHTML = `
+      <div class="quote-card-num">${quote.quote_number}</div>
+      <div class="quote-card-client">${esc(quote.client_name||'—')}</div>
+      <div class="quote-card-desc">${esc((quote.scope||'—').substring(0,70))}</div>
+      <span class="status-badge status-${quote.status}">${quote.status}</span>
+      <div class="quote-card-amount">$${(quote.grand_total||0).toFixed(0)}</div>
+      <select class="form-select" style="width:110px;font-size:12px;padding:5px 8px;" onchange="updateQuoteStatus('${quote.id}',this.value)" onclick="event.stopPropagation()">
+        <option value="draft" ${quote.status==='draft'?'selected':''}>Draft</option>
+        <option value="sent" ${quote.status==='sent'?'selected':''}>Sent</option>
+        <option value="approved" ${quote.status==='approved'?'selected':''}>Approved</option>
+        <option value="rejected" ${quote.status==='rejected'?'selected':''}>Rejected</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Edit</button>
+      <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Delete</button>`;
+    list.appendChild(el);
+  });
+}
+
+async function updateQuoteStatus(id, status) {
+  await sb.from('quotes').update({ status }).eq('id', id);
+  const q = quotesCache.find(q => q.id === id);
+  if (q) q.status = status;
+  renderStats();
+  renderQuotesList();
+}
+
+async function deleteQuote(id) {
+  if (!confirm('Delete this quote?')) return;
+  await sb.from('quotes').delete().eq('id', id);
+  quotesCache = quotesCache.filter(q => q.id !== id);
+  renderStats();
+  renderQuotesList();
+  toast('Quote deleted.', 'success');
+}
+
+// ============================================================
+// LOAD QUOTE FOR EDITING
+// ============================================================
+async function loadQuoteForEditing(id) {
+  const quote = quotesCache.find(q => q.id === id);
+  if (!quote) return;
+
+  // Load line items from DB
+  const { data: lines } = await sb.from('quote_line_items')
+    .select('*').eq('quote_id', id).order('sort_order');
+
+  editingQuoteId = id;
+  currentLineItems = (lines || []).map(l => ({
+    id: l.id,
+    description: l.description,
+    category: l.category,
+    quantity: l.quantity,
+    unit: l.unit,
+    unit_cost: l.unit_cost,
+  }));
+
+  // Fill in form fields
+  document.getElementById('q-client-name').value = quote.client_name || '';
+  document.getElementById('q-client-phone').value = quote.client_phone || '';
+  document.getElementById('q-client-email').value = quote.client_email || '';
+  document.getElementById('q-property').value = quote.client_property || '';
+  document.getElementById('q-notes').value = quote.internal_notes || '';
+  document.getElementById('q-scope').value = quote.scope || '';
+  document.getElementById('q-valid-until').value = quote.valid_until || '';
+  document.getElementById('total-override').value = '';
+  document.getElementById('inc-materials').checked = quote.includes_materials !== false;
+  document.getElementById('inc-equipment').checked = quote.includes_equipment !== false;
+  document.getElementById('margin-labor').value = quote.margin_labor || 40;
+  document.getElementById('margin-materials').value = quote.margin_materials || 25;
+  document.getElementById('margin-equipment').value = quote.margin_equipment || 25;
+
+  // Update UI to show edit mode
+  document.getElementById('quote-page-title').textContent = 'Edit Quote';
+  document.getElementById('quote-number-display').textContent = quote.quote_number;
+  document.getElementById('save-draft-btn').textContent = 'Update Quote';
+
+  renderLineItems();
+  showPage('new-quote');
+  toast(`Editing ${quote.quote_number}`, 'success');
+}
+
+// ============================================================
+// NEW QUOTE
+// ============================================================
+function updateQuoteNumberDisplay() {
+  document.getElementById('quote-number-display').textContent = 'QT-' + String(quoteCounter).padStart(4, '0');
+}
+
+function setDefaultNewQuote() {
+  document.getElementById('margin-labor').value = settingsCache.margin_labor || 40;
+  document.getElementById('margin-materials').value = settingsCache.margin_materials || 25;
+  document.getElementById('margin-equipment').value = settingsCache.margin_equipment || 25;
+  const d = new Date(); d.setDate(d.getDate() + 30);
+  document.getElementById('q-valid-until').value = d.toISOString().split('T')[0];
+  updateQuoteNumberDisplay();
+  liveUpdateTotals();
+}
+
+function clearQuote() {
+  if (currentLineItems.length > 0 && !confirm('Clear all line items?')) return;
+  editingQuoteId = null;
+  currentLineItems = [];
+  ['q-client-name','q-client-phone','q-client-email','q-property','q-notes','q-scope','total-override'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('quote-page-title').textContent = 'New Quote';
+  document.getElementById('save-draft-btn').textContent = 'Save Draft';
+  setDefaultNewQuote();
+  renderLineItems();
+}
+
+function addBlankLineItem() {
+  currentLineItems.push({ id: uid(), description: '', category: 'labor', quantity: 1, unit: 'hr', unit_cost: 0 });
+  renderLineItems();
+}
+
+function removeLineItem(id) {
+  currentLineItems = currentLineItems.filter(i => i.id !== id);
+  renderLineItems();
+}
+
+function updateLineItem(id, field, value) {
+  const item = currentLineItems.find(i => i.id === id);
+  if (item) { item[field] = (field === 'quantity' || field === 'unit_cost') ? parseFloat(value) || 0 : value; liveUpdateTotals(); }
+}
+
+function updateLineItemLive(id, field, value, inputEl) {
+  const item = currentLineItems.find(i => i.id === id);
+  if (!item) return;
+  item[field] = parseFloat(value) || 0;
+  // Update the total cell in the same row without re-rendering the whole table
+  const row = inputEl.closest('tr');
+  const totalCell = row ? row.querySelector('.line-total-cell') : null;
+  if (totalCell) totalCell.textContent = '$' + (item.quantity * item.unit_cost).toFixed(2);
+  liveUpdateTotals();
+}
+
+function renderLineItems() {
+  const tbody = document.getElementById('line-items-body');
+  const empty = document.getElementById('empty-lines');
+  tbody.innerHTML = '';
+  const incMat = document.getElementById('inc-materials').checked;
+  const incEq = document.getElementById('inc-equipment').checked;
+  if (currentLineItems.length === 0) { empty.style.display = 'block'; liveUpdateTotals(); return; }
+  empty.style.display = 'none';
+  currentLineItems.forEach(item => {
+    const grayed = (item.category === 'materials' && !incMat) || (item.category === 'equipment' && !incEq);
+    const lineTotal = item.quantity * item.unit_cost;
+    const tr = document.createElement('tr');
+    tr.style.opacity = grayed ? '0.4' : '1';
+    tr.innerHTML = `
+      <td><input value="${esc(item.description)}" placeholder="Description" oninput="updateLineItem('${item.id}','description',this.value)" /></td>
+      <td><select onchange="updateLineItem('${item.id}','category',this.value);renderLineItems();">
+        <option value="labor" ${item.category==='labor'?'selected':''}>Labor</option>
+        <option value="materials" ${item.category==='materials'?'selected':''}>Materials</option>
+        <option value="equipment" ${item.category==='equipment'?'selected':''}>Equipment</option>
+      </select></td>
+      <td><input type="number" value="${item.quantity}" min="0" step="0.5" oninput="updateLineItemLive('${item.id}','quantity',this.value,this)" style="width:70px;" /></td>
+      <td><input value="${esc(item.unit)}" placeholder="hr..." onchange="updateLineItem('${item.id}','unit',this.value)" style="width:70px;" /></td>
+      <td><input type="number" value="${item.unit_cost}" min="0" step="0.01" oninput="updateLineItemLive('${item.id}','unit_cost',this.value,this)" style="width:100px;" /></td>
+      <td class="line-total-cell" data-id="${item.id}" style="font-family:'DM Mono',monospace;font-size:13px;">$${lineTotal.toFixed(2)}</td>
+      <td><button onclick="removeLineItem('${item.id}')" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px;padding:2px 6px;">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+  liveUpdateTotals();
+}
+
+function liveUpdateTotals() {
+  const incMat = document.getElementById('inc-materials').checked;
+  const incEq = document.getElementById('inc-equipment').checked;
+  const mLab = parseFloat(document.getElementById('margin-labor').value) / 100 || 0;
+  const mMat = parseFloat(document.getElementById('margin-materials').value) / 100 || 0;
+  const mEq = parseFloat(document.getElementById('margin-equipment').value) / 100 || 0;
+  let cL = 0, cM = 0, cE = 0;
+  currentLineItems.forEach(i => {
+    const t = i.quantity * i.unit_cost;
+    if (i.category === 'labor') cL += t;
+    else if (i.category === 'materials') cM += t;
+    else if (i.category === 'equipment') cE += t;
+  });
+  const bL = mLab < 1 ? cL / (1 - mLab) : cL;
+  const bM = incMat ? (mMat < 1 ? cM / (1 - mMat) : cM) : 0;
+  const bE = incEq ? (mEq < 1 ? cE / (1 - mEq) : cE) : 0;
+  const total = bL + bM + bE;
+  const incIVU = document.getElementById('inc-ivu').checked;
+  const overrideVal3 = parseFloat(document.getElementById('total-override').value);
+  const baseForIVU = (!isNaN(overrideVal3) && overrideVal3 > 0) ? overrideVal3 : total;
+  const ivu = incIVU ? baseForIVU * 0.115 : 0;
+  const totalWithIVU = baseForIVU + ivu;
+
+  document.getElementById('t-labor').textContent = '$' + bL.toFixed(2);
+  document.getElementById('t-materials').textContent = '$' + bM.toFixed(2);
+  document.getElementById('t-equipment').textContent = '$' + bE.toFixed(2);
+  document.getElementById('t-subtotal').textContent = '$' + (cL + (incMat?cM:0) + (incEq?cE:0)).toFixed(2);
+  const overrideVal2 = parseFloat(document.getElementById('total-override').value);
+  const displayTotal = (!isNaN(overrideVal2) && overrideVal2 > 0) ? overrideVal2 : total;
+  document.getElementById('t-total').textContent = '$' + displayTotal.toFixed(2);
+  document.getElementById('t-ivu').textContent = '$' + ivu.toFixed(2);
+  document.getElementById('t-total').textContent = '$' + baseForIVU.toFixed(2);
+  document.getElementById('t-total-ivu').textContent = '$' + totalWithIVU.toFixed(2);
+  document.getElementById('tr-total-ivu').style.display = incIVU ? 'flex' : 'none';
+  document.getElementById('tr-materials').style.opacity = incMat ? '1' : '0.4';
+  document.getElementById('tr-equipment').style.opacity = incEq ? '1' : '0.4';
+}
+
+// ============================================================
+// AI PARSE
+// ============================================================
+async function parseScope() {
+  const scope = document.getElementById('q-scope').value.trim();
+  if (!scope) { toast('Enter a scope of work first.', 'error'); return; }
+  const btn = document.getElementById('ai-parse-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Parsing...';
+  try {
+    const resp = await fetch('/api/parse-scope', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope, catalog: catalogCache })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    data.items.forEach(item => {
+      currentLineItems.push({ id: uid(), description: item.description, category: item.category, quantity: item.quantity, unit: item.unit, unit_cost: item.unit_cost });
+    });
+    renderLineItems();
+    toast(`Added ${data.items.length} line items from AI.`, 'success');
+  } catch(e) {
+    toast('AI parsing failed: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<span>✦</span> Parse with AI <span class="ai-badge">AI</span>';
+}
+
+// ============================================================
+// CATALOG PICKER
+// ============================================================
+function openCatalogPicker() {
+  document.getElementById('catalog-picker-search').value = '';
+  renderCatalogPicker();
+  document.getElementById('catalog-modal').classList.add('open');
+}
+
+function renderCatalogPicker() {
+  const q = document.getElementById('catalog-picker-search').value.toLowerCase();
+  const items = catalogCache.filter(c => !q || c.description.toLowerCase().includes(q));
+  const list = document.getElementById('catalog-picker-list');
+  list.innerHTML = '';
+  if (items.length === 0) { list.innerHTML = '<div class="empty-state"><p>No items found.</p></div>'; return; }
+  items.forEach(item => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#f8faff;border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:600;font-size:13.5px;">${esc(item.description)}</div>
+        <div style="font-size:12px;color:var(--mid);margin-top:3px;"><span class="cat-badge cat-${item.category}">${item.category}</span> &nbsp;$${item.unit_cost} / ${item.unit||'unit'}</div>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="addCatalogItemToQuote('${item.id}')">+ Add</button>`;
+    list.appendChild(div);
+  });
+}
+
+async function addCatalogItemToQuote(id) {
+  const item = catalogCache.find(c => c.id === id);
+  if (!item) return;
+  currentLineItems.push({ id: uid(), description: item.description, category: item.category, quantity: item.default_qty || 1, unit: item.unit || '', unit_cost: item.unit_cost });
+  await sb.from('catalog').update({ use_count: (item.use_count || 0) + 1 }).eq('id', id);
+  item.use_count = (item.use_count || 0) + 1;
+  renderLineItems();
+  toast(`Added: ${item.description}`, 'success');
+}
+
+// ============================================================
+// SAVE QUOTE
+// ============================================================
+function buildTotals() {
+  const incIVU = document.getElementById('inc-ivu').checked;
+  const incMat = document.getElementById('inc-materials').checked;
+  const incEq = document.getElementById('inc-equipment').checked;
+  const mLab = parseFloat(document.getElementById('margin-labor').value) || 40;
+  const mMat = parseFloat(document.getElementById('margin-materials').value) || 25;
+  const mEq = parseFloat(document.getElementById('margin-equipment').value) || 25;
+  let cL=0,cM=0,cE=0;
+  currentLineItems.forEach(i => { const t=i.quantity*i.unit_cost; if(i.category==='labor')cL+=t; else if(i.category==='materials')cM+=t; else cE+=t; });
+  const bL=cL/(1-mLab/100), bM=incMat?cM/(1-mMat/100):0, bE=incEq?cE/(1-mEq/100):0;
+  const calcSubtotal = bL+bM+bE;
+  // Use manual override if provided
+  const overrideVal = parseFloat(document.getElementById('total-override').value);
+  const subtotal = !isNaN(overrideVal) && overrideVal > 0 ? overrideVal : calcSubtotal;
+  const ivu = incIVU ? subtotal * 0.115 : 0;
+  return { labor:bL, materials:bM, equipment:bE, total:subtotal, calcTotal:calcSubtotal, ivu, grandTotal:subtotal+ivu, incMat, incEq, incIVU, mLab, mMat, mEq, hasOverride: (!isNaN(overrideVal) && overrideVal > 0) };
+}
+
+function onOverrideInput() {
+  liveUpdateTotals();
+}
+
+async function saveQuoteDraft() {
+  const clientName = document.getElementById('q-client-name').value.trim();
+  if (!clientName) { toast('Enter a client name first.', 'error'); return; }
+  if (currentLineItems.length === 0) { toast('Add at least one line item.', 'error'); return; }
+  if (editingQuoteId) {
+    await updateExistingQuote(editingQuoteId, 'draft');
+    toast('Quote updated.', 'success');
+  } else {
+    await persistQuote('draft');
+    toast('Quote saved as draft.', 'success');
+  }
+}
+
+async function persistQuote(status) {
+  const t = buildTotals();
+  const qNum = 'QT-' + String(quoteCounter).padStart(4, '0');
+  const clientName = document.getElementById('q-client-name').value.trim();
+
+  // Upsert client
+  let clientId = null;
+  const existing = clientsCache.find(c => c.name.toLowerCase() === clientName.toLowerCase());
+  if (existing) { clientId = existing.id; }
+  else {
+    const { data: newClient } = await sb.from('clients').insert({ name: clientName, phone: document.getElementById('q-client-phone').value, email: document.getElementById('q-client-email').value, address: document.getElementById('q-property').value, type: 'Residential' }).select().single();
+    if (newClient) { clientId = newClient.id; await loadClients(); }
+  }
+
+  const quoteData = {
+    quote_number: qNum, status,
+    client_id: clientId, client_name: clientName,
+    client_phone: document.getElementById('q-client-phone').value,
+    client_email: document.getElementById('q-client-email').value,
+    client_property: document.getElementById('q-property').value,
+    scope: document.getElementById('q-scope').value,
+    internal_notes: document.getElementById('q-notes').value,
+    valid_until: document.getElementById('q-valid-until').value || null,
+    includes_materials: t.incMat, includes_equipment: t.incEq,
+    margin_labor: t.mLab, margin_materials: t.mMat, margin_equipment: t.mEq,
+    total_labor: t.labor, total_materials: t.materials, total_equipment: t.equipment,
+    grand_total: t.grandTotal,
+    created_by: currentUser.email
+  };
+
+  const { data: quote } = await sb.from('quotes').insert(quoteData).select().single();
+
+  if (quote) {
+    const lineInserts = currentLineItems.map((item, i) => ({ quote_id: quote.id, description: item.description, category: item.category, quantity: item.quantity, unit: item.unit, unit_cost: item.unit_cost, sort_order: i }));
+    if (lineInserts.length > 0) await sb.from('quote_line_items').insert(lineInserts);
+    // Feed catalog
+    for (const item of currentLineItems) {
+      if (!item.description) continue;
+      const exists = catalogCache.find(c => c.description.toLowerCase() === item.description.toLowerCase() && c.category === item.category);
+      if (!exists) { await sb.from('catalog').insert({ description: item.description, category: item.category, unit_cost: item.unit_cost, default_qty: item.quantity, unit: item.unit, use_count: 1 }); }
+    }
+    await loadCatalog();
+  }
+
+  // Increment counter
+  quoteCounter++;
+  await sb.from('settings').upsert({ key: 'quote_counter', value: String(quoteCounter) }, { onConflict: 'key' });
+  settingsCache.quote_counter = String(quoteCounter);
+  clearQuote();
+  return { quote, totals: t, qNum, clientName };
+}
+
+// ============================================================
+// UPDATE EXISTING QUOTE
+// ============================================================
+async function updateExistingQuote(id, status) {
+  const t = buildTotals();
+  const quote = quotesCache.find(q => q.id === id);
+  const qNum = quote ? quote.quote_number : '—';
+  const clientName = document.getElementById('q-client-name').value.trim();
+
+  const quoteData = {
+    status,
+    client_name: clientName,
+    client_phone: document.getElementById('q-client-phone').value,
+    client_email: document.getElementById('q-client-email').value,
+    client_property: document.getElementById('q-property').value,
+    scope: document.getElementById('q-scope').value,
+    internal_notes: document.getElementById('q-notes').value,
+    valid_until: document.getElementById('q-valid-until').value || null,
+    includes_materials: t.incMat, includes_equipment: t.incEq,
+    margin_labor: t.mLab, margin_materials: t.mMat, margin_equipment: t.mEq,
+    total_labor: t.labor, total_materials: t.materials, total_equipment: t.equipment,
+    grand_total: t.grandTotal,
+    updated_at: new Date().toISOString(),
+  };
+
+  await sb.from('quotes').update(quoteData).eq('id', id);
+
+  // Replace all line items: delete old, insert new
+  await sb.from('quote_line_items').delete().eq('quote_id', id);
+  const lineInserts = currentLineItems.map((item, i) => ({
+    quote_id: id, description: item.description, category: item.category,
+    quantity: item.quantity, unit: item.unit, unit_cost: item.unit_cost, sort_order: i
+  }));
+  if (lineInserts.length > 0) await sb.from('quote_line_items').insert(lineInserts);
+
+  // Update cache
+  const idx = quotesCache.findIndex(q => q.id === id);
+  if (idx >= 0) quotesCache[idx] = { ...quotesCache[idx], ...quoteData };
+
+  clearQuote();
+  return { qNum, totals: t };
+}
+
+// ============================================================
+// PDF GENERATION
+// ============================================================
+function openFinishModal() {
+  if (!document.getElementById('q-client-name').value.trim()) { toast('Enter a client name first.', 'error'); return; }
+  if (currentLineItems.length === 0) { toast('Add at least one line item.', 'error'); return; }
+  document.getElementById('finish-modal').classList.add('open');
+}
+
+function selectPdfStyle(el) {
+  document.querySelectorAll('#finish-modal .toggle-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  pdfStyle = el.dataset.style;
+}
+
+async function generatePDF() {
+  const btn = document.getElementById('pdf-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  const status = document.getElementById('finish-status').value;
+  const snapshot = {
+    lineItems: JSON.parse(JSON.stringify(currentLineItems)),
+    clientName: document.getElementById('q-client-name').value.trim(),
+    clientPhone: document.getElementById('q-client-phone').value,
+    clientEmail: document.getElementById('q-client-email').value,
+    clientProperty: document.getElementById('q-property').value,
+    scope: document.getElementById('q-scope').value,
+    validUntil: document.getElementById('q-valid-until').value,
+    incMat: document.getElementById('inc-materials').checked === true,
+    incEq: document.getElementById('inc-equipment').checked === true,
+    mLab: parseFloat(document.getElementById('margin-labor').value)||40,
+    mMat: parseFloat(document.getElementById('margin-materials').value)||25,
+    mEq: parseFloat(document.getElementById('margin-equipment').value)||25,
+    incIVU: document.getElementById('inc-ivu').checked,
+    totalOverride: parseFloat(document.getElementById('total-override').value) || null,
+  };
+
+  let result;
+  if (editingQuoteId) {
+    result = await updateExistingQuote(editingQuoteId, status);
+  } else {
+    result = await persistQuote(status);
+  }
+  closeModal('finish-modal');
+
+  await buildAndDownloadPDF(snapshot, result.qNum, result.totals);
+  toast(`${result.qNum} saved & PDF downloaded!`, 'success');
+
+  btn.disabled = false;
+  btn.innerHTML = '⬇ Download PDF';
+}
+
+async function buildAndDownloadPDF(snap, qNum, t) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, mg = 18;
+  let y = mg;
+  const s = settingsCache;
+
+  // Header — white background, clean minimal
+  doc.setFillColor(255,255,255);
+  doc.rect(0,0,W,52,'F');
+  doc.setFillColor(54,82,165);
+  doc.rect(0,52,W,1,'F');
+
+  // Logo — loaded via canvas trick for jsPDF compatibility
+  try {
+    const { dataURL: logoDataURL, w: logoW, h: logoH } = await loadImageAsDataURL('https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png');
+    const targetH = 35;
+    const targetW = targetH * (logoW / logoH);
+    doc.addImage(logoDataURL, 'PNG', mg, 6, targetW, targetH);
+  } catch(e) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(20,37,67);
+    doc.text('domo', mg, 28);
+  }
+
+  // Tagline below logo
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(54,82,165);
+  doc.text('Cuidar tu casa en Puerto Rico nunca había sido tan fácil.', mg, 46);
+
+  // Contact right-aligned
+  const phone = '(787) 419-0300';
+  const email = 'info@domoyourhome.com';
+  const website = 'domoyourhome.com';
+  doc.setTextColor(120,135,160); doc.setFontSize(8);
+  doc.text(`${phone}  ·  ${email}`, W-mg, 20, {align:'right'});
+  doc.text(website, W-mg, 28, {align:'right'});
+
+  y = 58;
+
+  // Quote info
+  doc.setFillColor(247,248,252);
+  doc.rect(0,y,W,16,'F');
+  doc.setFillColor(226,231,240);
+  doc.rect(0,y+16,W,0.5,'F');
+  doc.setTextColor(20,37,67);
+  const infoItems = [
+    { label:'QUOTE', val: qNum },
+    { label:'DATE', val: new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) },
+    { label:'VALID UNTIL', val: snap.validUntil || '—' },
+  ];
+  infoItems.forEach((item,i) => {
+    const x = mg + 4 + i*58;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(100,115,140);
+    doc.text(item.label, x, y+6);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,37,67);
+    doc.text(item.val, x, y+13);
+  });
+  y += 24;
+
+  // Client
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,115,140);
+  doc.text('PREPARED FOR', mg, y);
+  y += 6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,37,67);
+  doc.text(snap.clientName, mg, y); y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,95,120);
+  if (snap.clientProperty) { doc.text(snap.clientProperty, mg, y); y += 4.5; }
+  if (snap.clientPhone) { doc.text(snap.clientPhone, mg, y); y += 4.5; }
+  if (snap.clientEmail) { doc.text(snap.clientEmail, mg, y); y += 4.5; }
+  y += 8;
+
+  // Scope
+  if (snap.scope) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,115,140);
+    doc.text('SCOPE OF WORK', mg, y); y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,55,80);
+    const scopeLines = doc.splitTextToSize(snap.scope, W-mg*2);
+    const lineH = 4.8;
+    const pageH = 297;
+    const footerY = 263;
+    scopeLines.forEach(line => {
+      if (y + lineH > footerY - 20) { doc.addPage(); y = mg; }
+      doc.text(line, mg, y);
+      y += lineH;
+    });
+    y += 6;
+  }
+
+  // Table header — skip for lump sum
+  if (pdfStyle !== 'lumpsum') {
+    doc.setFillColor(54,82,165);
+    doc.rect(mg,y,W-mg*2,7,'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    if (pdfStyle === 'itemized') {
+      doc.text('DESCRIPTION', mg+3, y+4.8);
+      doc.text('CAT', mg+82, y+4.8);
+      doc.text('QTY', mg+100, y+4.8);
+      doc.text('UNIT', mg+112, y+4.8);
+      doc.text('UNIT COST', mg+126, y+4.8);
+      doc.text('TOTAL', W-mg-3, y+4.8, {align:'right'});
+    } else {
+      doc.text('CATEGORY', mg+3, y+4.8);
+      doc.text('AMOUNT', W-mg-3, y+4.8, {align:'right'});
+    }
+    y += 7;
+  }
+
+  if (pdfStyle === 'lumpsum') {
+    // Lump sum: just show scope description and one total, no breakdown
+    y += 10;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(20,37,67);
+    doc.text('Professional services as described above.', mg+3, y);
+    y += 6;
+    doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(120,135,160);
+    const inclParts = ['labor'];
+    if (snap.incMat === true) inclParts.push('materials');
+    if (snap.incEq === true) inclParts.push('equipment');
+    const inclusionStr = 'Includes ' + inclParts.join(', ') + ' required to complete the work.';
+    doc.text(inclusionStr, mg+3, y);
+    y += 10;
+  } else if (pdfStyle === 'itemized') {
+    const visible = snap.lineItems.filter(i => !(i.category==='materials'&&!snap.incMat) && !(i.category==='equipment'&&!snap.incEq));
+    visible.forEach((item,i) => {
+      if (i%2===0) { doc.setFillColor(247,248,252); doc.rect(mg,y-1,W-mg*2,6.5,'F'); }
+      doc.setTextColor(20,37,67); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+      doc.text(doc.splitTextToSize(item.description,78)[0], mg+3, y+3.5);
+      doc.text(item.category.charAt(0).toUpperCase()+item.category.slice(1), mg+82, y+3.5);
+      doc.text(String(item.quantity), mg+100, y+3.5);
+      doc.text(item.unit||'', mg+112, y+3.5);
+      doc.text('$'+item.unit_cost.toFixed(2), mg+126, y+3.5);
+      doc.text('$'+(item.quantity*item.unit_cost).toFixed(2), W-mg-3, y+3.5, {align:'right'});
+      doc.setDrawColor(226,231,240); doc.line(mg,y+5.5,W-mg,y+5.5);
+      y += 6.5;
+    });
+  } else {
+    const rows = [
+      {label:'Labor', val:t.labor},
+      ...(snap.incMat?[{label:'Materials',val:t.materials}]:[]),
+      ...(snap.incEq?[{label:'Equipment',val:t.equipment}]:[]),
+    ];
+    rows.forEach((row,i) => {
+      if(i%2===0){doc.setFillColor(247,248,252);doc.rect(mg,y-1,W-mg*2,7,'F');}
+      doc.setTextColor(20,37,67);doc.setFont('helvetica','normal');doc.setFontSize(9);
+      doc.text(row.label,mg+3,y+4);
+      doc.text('$'+row.val.toFixed(2),W-mg-3,y+4,{align:'right'});
+      y+=7;
+    });
+  }
+
+  // Total section
+  y += 8;
+  doc.setDrawColor(226,231,240); doc.line(mg, y, W-mg, y);
+  y += 7;
+
+  if (snap.incIVU) {
+    // Big number = subtotal before tax
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,135,160);
+    doc.text('SUBTOTAL', mg, y+5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(20,37,67);
+    doc.text('$'+t.total.toFixed(2), W-mg, y+6, {align:'right'});
+    y += 12;
+    // Smaller IVU line
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,115,140);
+    doc.text('IVU 11.5%', W-mg-55, y+4);
+    doc.text('+ $'+(t.ivu||0).toFixed(2), W-mg-3, y+4, {align:'right'});
+    y += 9;
+    // Grand total with IVU
+    doc.setDrawColor(200,210,228); doc.line(W-mg-80, y, W-mg, y);
+    y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(120,135,160);
+    doc.text('TOTAL CON IVU', mg, y+5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,37,67);
+    doc.text('$'+(t.grandTotal||t.total).toFixed(2), W-mg, y+6, {align:'right'});
+  } else {
+    // No IVU — just one big total
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,135,160);
+    doc.text('TOTAL ESTIMATE', mg, y+5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(20,37,67);
+    doc.text('$'+t.total.toFixed(2), W-mg, y+6, {align:'right'});
+  }
+
+  // Footer
+  const fy = 263;
+  doc.setDrawColor(226,231,240); doc.line(mg,fy,W-mg,fy);
+  doc.setFillColor(255,255,255); doc.rect(0,fy,W,34,'F');
+  doc.setTextColor(100,115,140); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  const footerTxt = s.pdf_footer || 'Pago: 100% al completar el trabajo. Precios pueden variar según condiciones del proyecto. Cotización válida por 30 días.';
+  const footerLines = doc.splitTextToSize(footerTxt, W-mg*2);
+  doc.text(footerLines.slice(0,2), mg, fy+9);
+  // Footer contact line — always hardcoded correct values
+  const footerPhone = '(787) 419-0300';
+  const footerEmail = 'info@domoyourhome.com';
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(20,37,67);
+  doc.text('domo', mg, fy+22);
+  doc.setFont('helvetica','normal'); doc.setTextColor(120,135,160);
+  doc.text(`${footerPhone}  ·  ${footerEmail}`, mg+12, fy+22);
+
+  doc.save(`${qNum} - ${snap.clientName}.pdf`);
+}
+
+// ============================================================
+// MODAL + TOAST + UTILS
+// ============================================================
+function loadImageAsDataURL(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      const dataURL = canvas.toDataURL('image/png');
+      // Attach dimensions to the string so we can read them later
+      dataURL.naturalWidth = img.naturalWidth;
+      dataURL.naturalHeight = img.naturalHeight;
+      resolve({ dataURL, w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast show '+type;
+  setTimeout(() => el.className = 'toast', 3000);
+}
+function uid() { return Math.random().toString(36).substr(2,9); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// INIT
+checkSession();
+</script>
+</body>
+</html>

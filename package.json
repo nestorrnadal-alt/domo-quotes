@@ -1,0 +1,8 @@
+{
+  "name": "domo-quote-tool",
+  "version": "1.0.0",
+  "description": "Domo Home Services Quote Tool",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  }
+}
