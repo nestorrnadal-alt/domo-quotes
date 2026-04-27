@@ -881,6 +881,11 @@ function renderQuotesList() {
         <option value="approved" ${quote.status==='approved'?'selected':''}>Approved</option>
         <option value="rejected" ${quote.status==='rejected'?'selected':''}>Rejected</option>
       </select>
+      <select class="form-select" style="width:120px;font-size:12px;padding:5px 8px;" onchange="updateQuoteLifecycle('${quote.id}',this.value)" onclick="event.stopPropagation()" ${quote.status!=='approved'?'disabled':''} title="${quote.status!=='approved'?'Only available when Approved':'Mark booked or invoiced'}">
+        <option value="" ${!quote.lifecycle_stage?'selected':''}>—</option>
+        <option value="booked" ${quote.lifecycle_stage==='booked'?'selected':''}>📅 Booked</option>
+        <option value="invoiced" ${quote.lifecycle_stage==='invoiced'?'selected':''}>💰 Invoiced</option>
+      </select>
       <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Edit</button>
       <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Delete</button>`;
     list.appendChild(el);
@@ -891,6 +896,16 @@ async function updateQuoteStatus(id, status) {
   await sb.from('quotes').update({ status }).eq('id', id);
   const q = quotesCache.find(q => q.id === id);
   if (q) q.status = status;
+  renderStats();
+  renderQuotesList();
+}
+
+async function updateQuoteLifecycle(id, stage) {
+  // stage is one of '', 'booked', 'invoiced'. Empty string clears the column.
+  const value = stage || null;
+  await sb.from('quotes').update({ lifecycle_stage: value }).eq('id', id);
+  const q = quotesCache.find(q => q.id === id);
+  if (q) q.lifecycle_stage = value;
   renderStats();
   renderQuotesList();
 }
