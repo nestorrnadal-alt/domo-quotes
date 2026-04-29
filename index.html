@@ -401,7 +401,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
       <span class="search-icon">⌕</span>
       <input type="text" placeholder="Search by client, description..." id="quotes-search" oninput="renderQuotesList()" />
       <select class="form-select" id="quotes-filter" style="border:none;width:160px;font-size:13px;" onchange="renderQuotesList()">
-        <option value="open" selected>Open (Draft+Sent+Approved)</option>
+        <option value="open" selected>Open · Action needed</option>
         <option value="">All Status</option>
         <option value="draft">Draft</option>
         <option value="sent">Sent</option>
@@ -860,8 +860,16 @@ function renderQuotesList() {
   const quotes = quotesCache.filter(quote => {
     const mQ = !q || (quote.client_name||'').toLowerCase().includes(q) || (quote.scope||'').toLowerCase().includes(q) || (quote.quote_number||'').toLowerCase().includes(q);
     let mF;
-    if (filter === 'open') mF = quote.status !== 'rejected';
-    else mF = !filter || quote.status === filter;
+    if (filter === 'open') {
+      // Open = needs action by Cotto: drafts (need to send), sent (awaiting reply),
+      // and approved quotes that haven't been booked or invoiced yet.
+      // Hide: rejected, and approved+booked / approved+invoiced (already handled).
+      if (quote.status === 'rejected') mF = false;
+      else if (quote.status === 'approved' && (quote.lifecycle_stage === 'booked' || quote.lifecycle_stage === 'invoiced')) mF = false;
+      else mF = true;
+    } else {
+      mF = !filter || quote.status === filter;
+    }
     return mQ && mF;
   });
   const list = document.getElementById('quotes-list');
