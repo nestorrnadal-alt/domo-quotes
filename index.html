@@ -400,7 +400,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
     <div class="search-bar">
       <span class="search-icon">⌕</span>
       <input type="text" placeholder="Search by client, description..." id="quotes-search" oninput="renderQuotesList()" />
-      <select class="form-select" id="quotes-filter" style="border:none;width:120px;font-size:13px;" onchange="renderQuotesList()">
+      <select class="form-select" id="quotes-filter" style="border:none;width:160px;font-size:13px;" onchange="renderQuotesList()">
+        <option value="open" selected>Open (Draft+Sent+Approved)</option>
         <option value="">All Status</option>
         <option value="draft">Draft</option>
         <option value="sent">Sent</option>
@@ -858,7 +859,9 @@ function renderQuotesList() {
   const filter = document.getElementById('quotes-filter')?.value || '';
   const quotes = quotesCache.filter(quote => {
     const mQ = !q || (quote.client_name||'').toLowerCase().includes(q) || (quote.scope||'').toLowerCase().includes(q) || (quote.quote_number||'').toLowerCase().includes(q);
-    const mF = !filter || quote.status === filter;
+    let mF;
+    if (filter === 'open') mF = quote.status !== 'rejected';
+    else mF = !filter || quote.status === filter;
     return mQ && mF;
   });
   const list = document.getElementById('quotes-list');
@@ -1183,13 +1186,15 @@ async function saveQuoteDraft() {
   const clientName = document.getElementById('q-client-name').value.trim();
   if (!clientName) { toast('Enter a client name first.', 'error'); return; }
   if (currentLineItems.length === 0) { toast('Add at least one line item.', 'error'); return; }
+  let result;
   if (editingQuoteId) {
-    await updateExistingQuote(editingQuoteId, 'draft');
-    toast('Quote updated.', 'success');
+    result = await updateExistingQuote(editingQuoteId, 'draft');
+    if (result) toast('Quote updated.', 'success');
   } else {
-    await persistQuote('draft');
-    toast('Quote saved as draft.', 'success');
+    result = await persistQuote('draft');
+    if (result) toast('Quote saved as draft.', 'success');
   }
+  if (result) await loadAndRenderQuotes();
 }
 
 async function persistQuote(status) {
@@ -1222,26 +1227,40 @@ async function persistQuote(status) {
     created_by: currentUser.email
   };
 
-  const { data: quote } = await sb.from('quotes').insert(quoteData).select().single();
+  let { data: quote, error: insertErr } = await sb.from('quotes').insert(quoteData).select().single();
 
-  if (quote) {
-    const lineInserts = currentLineItems.map((item, i) => ({ quote_id: quote.id, description: item.description, category: item.category, quantity: item.quantity, unit: item.unit, unit_cost: item.unit_cost, sort_order: i }));
-    if (lineInserts.length > 0) await sb.from('quote_line_items').insert(lineInserts);
-    // Feed catalog
-    for (const item of currentLineItems) {
-      if (!item.description) continue;
-      const exists = catalogCache.find(c => c.description.toLowerCase() === item.description.toLowerCase() && c.category === item.category);
-      if (!exists) { await sb.from('catalog').insert({ description: item.description, category: item.category, unit_cost: item.unit_cost, default_qty: item.quantity, unit: item.unit, use_count: 1 }); }
+  // Fallback: if trigger blocked saving as 'sent' due to missing contact, retry as 'draft' so we don't lose work
+  let downgradedToDraft = false;
+  if (insertErr && status === 'sent' && /missing both client_phone and client_email/i.test(insertErr.message || '')) {
+    quoteData.status = 'draft';
+    ({ data: quote, error: insertErr } = await sb.from('quotes').insert(quoteData).select().single());
+    if (!insertErr && quote) {
+      downgradedToDraft = true;
+      toast('Saved as draft — add phone or email before marking as sent.', 'success');
     }
-    await loadCatalog();
   }
 
-  // Increment counter
+  if (insertErr || !quote) {
+    toast(insertErr ? `Save failed: ${insertErr.message}` : 'Save failed — quote was not saved.', 'error');
+    return null;
+  }
+
+  const lineInserts = currentLineItems.map((item, i) => ({ quote_id: quote.id, description: item.description, category: item.category, quantity: item.quantity, unit: item.unit, unit_cost: item.unit_cost, sort_order: i }));
+  if (lineInserts.length > 0) await sb.from('quote_line_items').insert(lineInserts);
+  // Feed catalog
+  for (const item of currentLineItems) {
+    if (!item.description) continue;
+    const exists = catalogCache.find(c => c.description.toLowerCase() === item.description.toLowerCase() && c.category === item.category);
+    if (!exists) { await sb.from('catalog').insert({ description: item.description, category: item.category, unit_cost: item.unit_cost, default_qty: item.quantity, unit: item.unit, use_count: 1 }); }
+  }
+  await loadCatalog();
+
+  // Increment counter only after a successful save
   quoteCounter++;
   await sb.from('settings').upsert({ key: 'quote_counter', value: String(quoteCounter) }, { onConflict: 'key' });
   settingsCache.quote_counter = String(quoteCounter);
   clearQuote();
-  return { quote, totals: t, qNum, clientName };
+  return { quote, totals: t, qNum, clientName, downgradedToDraft };
 }
 
 // ============================================================
@@ -1269,7 +1288,23 @@ async function updateExistingQuote(id, status) {
     updated_at: new Date().toISOString(),
   };
 
-  await sb.from('quotes').update(quoteData).eq('id', id);
+  let { error: updateErr } = await sb.from('quotes').update(quoteData).eq('id', id);
+
+  // Fallback: if trigger blocked update to 'sent' due to missing contact, downgrade to draft
+  let downgradedToDraft = false;
+  if (updateErr && status === 'sent' && /missing both client_phone and client_email/i.test(updateErr.message || '')) {
+    quoteData.status = 'draft';
+    ({ error: updateErr } = await sb.from('quotes').update(quoteData).eq('id', id));
+    if (!updateErr) {
+      downgradedToDraft = true;
+      toast('Saved as draft — add phone or email before marking as sent.', 'success');
+    }
+  }
+
+  if (updateErr) {
+    toast(`Save failed: ${updateErr.message}`, 'error');
+    return null;
+  }
 
   // Replace all line items: delete old, insert new
   await sb.from('quote_line_items').delete().eq('quote_id', id);
@@ -1284,7 +1319,7 @@ async function updateExistingQuote(id, status) {
   if (idx >= 0) quotesCache[idx] = { ...quotesCache[idx], ...quoteData };
 
   clearQuote();
-  return { qNum, totals: t };
+  return { qNum, totals: t, downgradedToDraft };
 }
 
 // ============================================================
@@ -1333,11 +1368,25 @@ async function generatePDF() {
   }
   closeModal('finish-modal');
 
+  // Save failed — error toast already shown by persistQuote/updateExistingQuote. Don't generate PDF.
+  if (!result) {
+    btn.disabled = false;
+    btn.innerHTML = '⬇ Download PDF';
+    await loadAndRenderQuotes();
+    return;
+  }
+
   await buildAndDownloadPDF(snapshot, result.qNum, result.totals);
-  toast(`${result.qNum} saved & PDF downloaded!`, 'success');
+  // If save was downgraded to draft, the draft toast already fired; skip the generic 'saved & PDF downloaded' to avoid contradicting it.
+  if (!result.downgradedToDraft) {
+    toast(`${result.qNum} saved & PDF downloaded!`, 'success');
+  } else {
+    toast('PDF downloaded.', 'success');
+  }
 
   btn.disabled = false;
   btn.innerHTML = '⬇ Download PDF';
+  await loadQuotes();
 }
 
 async function buildAndDownloadPDF(snap, qNum, t) {
