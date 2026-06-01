@@ -1467,20 +1467,34 @@ async function buildAndDownloadPDF(snap, qNum, t) {
   if (snap.clientEmail) { doc.text(snap.clientEmail, mg, y); y += 4.5; }
   y += 8;
 
-  // Scope
+  // Scope (adaptive — keeps the totals + footer on ONE page)
   if (snap.scope) {
     doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,115,140);
     doc.text('SCOPE OF WORK', mg, y); y += 5;
-    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,55,80);
-    const scopeLines = doc.splitTextToSize(snap.scope, W-mg*2);
-    const lineH = 4.8;
-    const pageH = 297;
+    doc.setFont('helvetica','normal'); doc.setTextColor(40,55,80);
     const footerY = 263;
-    scopeLines.forEach(line => {
-      if (y + lineH > footerY - 20) { doc.addPage(); y = mg; }
-      doc.text(line, mg, y);
-      y += lineH;
-    });
+    const totalsH = snap.incIVU ? 52 : 26;
+    let belowScope = totalsH + 8;
+    if (pdfStyle === 'lumpsum') {
+      belowScope += 26;
+    } else if (pdfStyle === 'itemized') {
+      const visN = snap.lineItems.filter(it => !(it.category === 'materials' && !snap.incMat) && !(it.category === 'equipment' && !snap.incEq)).length;
+      belowScope += 7 + visN * 6.5;
+    } else {
+      const rowN = 1 + (snap.incMat ? 1 : 0) + (snap.incEq ? 1 : 0);
+      belowScope += 7 + rowN * 7;
+    }
+    const scopeAvail = Math.max(16, (footerY - 6 - belowScope) - y);
+    let fs = 9, lineH = 4.8;
+    doc.setFontSize(fs);
+    let scopeLines = doc.splitTextToSize(snap.scope, W-mg*2);
+    while (scopeLines.length * lineH > scopeAvail && fs > 6) {
+      fs -= 0.5; lineH = fs * 0.533;
+      doc.setFontSize(fs);
+      scopeLines = doc.splitTextToSize(snap.scope, W-mg*2);
+    }
+    doc.setFontSize(fs);
+    scopeLines.forEach(line => { doc.text(line, mg, y); y += lineH; });
     y += 6;
   }
 
@@ -1546,6 +1560,7 @@ async function buildAndDownloadPDF(snap, qNum, t) {
   }
 
   // Total section
+  y = Math.min(y, snap.incIVU ? 211 : 236); // safety: keep totals on one page
   y += 8;
   doc.setDrawColor(226,231,240); doc.line(mg, y, W-mg, y);
   y += 7;
