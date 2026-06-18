@@ -854,6 +854,21 @@ function renderStats() {
   document.getElementById('quotes-count').textContent = `${quotesCache.length} quotes total`;
 }
 
+// Price-meter gauge — reads quotes.price_band written by the lead-owner agent.
+// Advisory only; renders nothing when absent or 'no_data'. Hover shows the reason.
+function priceBandPill(pb) {
+  if (!pb || !pb.band) return '';
+  const m = {
+    fair:              { t: '🟢 Precio OK',     c: '#1a7f37', b: '#e6f4ea' },
+    high:              { t: '🔴 Precio alto',   c: '#b3261e', b: '#fce8e6' },
+    low:               { t: '🟡 Revisar precio',c: '#8a6d00', b: '#fef7e0' },
+    insufficient_data: { t: '⚪ Pocos datos',   c: '#888',    b: '#f0ece6' },
+  }[pb.band];
+  if (!m) return '';
+  const note = esc((pb.note || '') + (pb.confidence ? ' · ' + pb.confidence : ''));
+  return `<span class="price-band" title="${note}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;color:${m.c};background:${m.b};white-space:nowrap;">${m.t}</span>`;
+}
+
 function renderQuotesList() {
   const q = (document.getElementById('quotes-search')?.value || '').toLowerCase();
   const filter = document.getElementById('quotes-filter')?.value || '';
@@ -886,6 +901,7 @@ function renderQuotesList() {
       <div class="quote-card-desc">${esc((quote.scope||'—').substring(0,70))}</div>
       <span class="status-badge status-${quote.status}">${quote.status}</span>
       <div class="quote-card-amount">$${(quote.grand_total||0).toFixed(0)}</div>
+      ${priceBandPill(quote.price_band)}
       <select class="form-select" style="width:110px;font-size:12px;padding:5px 8px;" onchange="updateQuoteStatus('${quote.id}',this.value)" onclick="event.stopPropagation()">
         <option value="draft" ${quote.status==='draft'?'selected':''}>Draft</option>
         <option value="sent" ${quote.status==='sent'?'selected':''}>Sent</option>
