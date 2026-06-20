@@ -1124,7 +1124,11 @@ async function parseScope() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Parsing...';
   try {
-    const resp = await fetch('/api/parse-scope', {
+    // On Netlify the redirect /api/* -> functions handles this. Elsewhere
+    // (GitHub Pages / local preview) call the Supabase Edge Function directly.
+    const onNetlify = location.hostname.endsWith('.netlify.app') || location.hostname === 'quotes.domoyourhome.com';
+    const parseUrl = onNetlify ? '/api/parse-scope' : (SUPABASE_URL + '/functions/v1/parse-scope');
+    const resp = await fetch(parseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scope, catalog: catalogCache })
