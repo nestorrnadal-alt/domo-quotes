@@ -1125,12 +1125,15 @@ async function parseScope() {
   btn.innerHTML = '<span class="spinner"></span> Parsing...';
   try {
     // On Netlify the redirect /api/* -> functions handles this. Elsewhere
-    // (GitHub Pages / local preview) call the Supabase Edge Function directly.
+    // (GitHub Pages / githack / local preview) call the Supabase Edge Function
+    // directly — which requires the apikey/Authorization header at the gateway.
     const onNetlify = location.hostname.endsWith('.netlify.app') || location.hostname === 'quotes.domoyourhome.com';
     const parseUrl = onNetlify ? '/api/parse-scope' : (SUPABASE_URL + '/functions/v1/parse-scope');
+    const parseHeaders = { 'Content-Type': 'application/json' };
+    if (!onNetlify) { parseHeaders['apikey'] = SUPABASE_ANON; parseHeaders['Authorization'] = 'Bearer ' + SUPABASE_ANON; }
     const resp = await fetch(parseUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: parseHeaders,
       body: JSON.stringify({ scope, catalog: catalogCache })
     });
     const data = await resp.json();
