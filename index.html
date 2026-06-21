@@ -687,6 +687,7 @@ let clientsCache = [];
 let quotesCache = [];
 let quoteCounter = 1;
 let editingQuoteId = null; // null = new quote, uuid = editing existing
+let pendingShadowSourceId = null; // set when a new quote was started from a shadow; saved as source_shadow_id
 
 // ============================================================
 // AUTH
@@ -1041,6 +1042,14 @@ function primaryActionHtml(quote) {
 }
 
 function quoteDetailHtml(quote) {
+  // Shadow = bot draft. Its only real actions are "Cotizar" (primary button) or
+  // discard — no status/lifecycle editing, and never opened in the in-place editor.
+  if (quote.status === 'shadow') {
+    return `<div class="q-detail-controls" style="align-items:center;">
+        <span style="font-size:12px;color:var(--mid);">Borrador del asistente IA — dale <b>Cotizar →</b> para crear una cotización real (este borrador se borra solo al enviarla).</span>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Descartar</button>
+      </div>`;
+  }
   let resp = '';
   if (quote.status === 'sent') {
     resp = `<div class="q-resp">
@@ -1048,15 +1057,10 @@ function quoteDetailHtml(quote) {
       <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();updateQuoteStatus('${quote.id}','rejected')">✗ Rechazada</button>
     </div>`;
   }
-  // Shadows are never opened with the in-place editor (would consolidate them
-  // into a real quote). "Editar" on a shadow starts a new quote from it instead.
-  const editBtn = quote.status === 'shadow'
-    ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();startFromShadow('${quote.id}')">✎ Cotizar desde este</button>`
-    : `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Editar</button>`;
   return `${resp}<div class="q-detail-controls">
       ${statusSelectHtml(quote)}
       ${lifecycleSelectHtml(quote)}
-      ${editBtn}
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Editar</button>
       <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Eliminar</button>
     </div>`;
 }
@@ -1202,6 +1206,7 @@ async function loadQuoteForEditing(id) {
     .select('*').eq('quote_id', id).order('sort_order');
 
   editingQuoteId = id;
+  pendingShadowSourceId = null; // editing a real quote — not derived from a shadow
   currentLineItems = (lines || []).map(l => ({
     id: l.id,
     description: l.description,
@@ -1248,6 +1253,7 @@ async function startFromShadow(id) {
     .select('*').eq('quote_id', id).order('sort_order');
 
   editingQuoteId = null; // <-- not editing the shadow; this becomes a new quote
+  pendingShadowSourceId = id; // link the new quote to this shadow; shadow is deleted once the new quote is sent
   currentLineItems = (lines || []).map(l => ({
     id: uid(), description: l.description, category: l.category,
     quantity: l.quantity, unit: l.unit, unit_cost: l.unit_cost,
@@ -1298,6 +1304,7 @@ function setDefaultNewQuote() {
 function clearQuote() {
   if (currentLineItems.length > 0 && !confirm('Clear all line items?')) return;
   editingQuoteId = null;
+  pendingShadowSourceId = null;
   currentLineItems = [];
   ['q-client-name','q-client-phone','q-client-email','q-property','q-notes','q-scope','total-override'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('quote-page-title').textContent = 'Nueva cotización';
@@ -1621,6 +1628,7 @@ async function persistQuote(status) {
     margin_labor: t.mLab, margin_materials: t.mMat, margin_equipment: t.mEq,
     total_labor: t.labor, total_materials: t.materials, total_equipment: t.equipment,
     grand_total: t.grandTotal,
+    source_shadow_id: pendingShadowSourceId || null,
     created_by: currentUser.email
   };
 
