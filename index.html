@@ -217,6 +217,43 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
 .mt-16 { margin-top: 16px; }
 .align-start { align-items: flex-start; }
 .flex-1 { flex: 1; }
+
+/* ===== LIVE PRICE METER (New Quote) ===== */
+.live-meter { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); }
+.live-meter-label { font-size: 11px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
+.lm-pill { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:700; padding:6px 12px; border-radius:999px; white-space:nowrap; }
+.lm-range { font-size:12px; color:rgba(255,255,255,0.6); margin-top:8px; font-family:'DM Mono',monospace; }
+.lm-note { font-size:11.5px; color:rgba(255,255,255,0.45); margin-top:6px; line-height:1.4; }
+.lm-spin { font-size:12px; color:rgba(255,255,255,0.4); display:flex; align-items:center; gap:8px; }
+
+/* ===== WORK QUEUE ===== */
+.queue-group { margin-bottom: 26px; }
+.queue-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.queue-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; color:var(--dark); }
+.queue-count { font-family:'DM Mono',monospace; font-size:12px; font-weight:600; color:var(--mid); background:var(--cream); padding:2px 9px; border-radius:999px; }
+.queue-emoji { font-size:17px; }
+.queue-empty { font-size:13px; color:var(--mid); padding:10px 2px; font-style:italic; }
+
+.q-card { background:white; border:1.5px solid var(--border); border-radius:12px; padding:14px 18px; transition:all .15s; }
+.q-card:hover { border-color:var(--primary); box-shadow:0 2px 12px rgba(54,82,165,.08); }
+.q-card.urgent { border-left:4px solid var(--red); }
+.q-main { display:flex; align-items:center; gap:14px; }
+.q-info { flex:1; min-width:0; }
+.q-client { font-weight:700; font-size:14.5px; color:var(--dark); }
+.q-scope { font-size:13px; color:var(--mid); margin-top:3px; line-height:1.4; }
+.q-meta { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.q-price { font-family:'Syne',sans-serif; font-weight:800; font-size:17px; color:var(--dark); }
+.q-num { font-family:'DM Mono',monospace; font-size:11px; color:var(--mid); }
+.countdown { display:inline-flex; align-items:center; gap:5px; font-family:'DM Mono',monospace; font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; background:#eef1f8; color:var(--primary); }
+.countdown.warn { background:#fef7e0; color:#8a6d00; }
+.countdown.over { background:#fce8e6; color:var(--red); }
+.q-expand-btn { background:none; border:1.5px solid var(--border); border-radius:8px; cursor:pointer; color:var(--mid); font-size:13px; padding:6px 10px; line-height:1; }
+.q-expand-btn:hover { background:var(--cream); }
+.q-detail { display:none; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border); }
+.q-card.open .q-detail { display:block; }
+.q-detail-controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.q-resp { display:flex; gap:10px; margin-top:4px; margin-bottom:12px; }
+.queue-group .q-card + .q-card { margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -252,17 +289,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
     <div class="logo-sub">Quote Tool</div>
   </div>
   <div class="nav">
-    <div class="nav-item active" data-page="new-quote"><span class="nav-icon">✦</span><span>New Quote</span></div>
-    <div class="nav-item" data-page="quotes"><span class="nav-icon">◈</span><span>Quotes</span></div>
+    <div class="nav-item active" data-page="new-quote"><span class="nav-icon">✦</span><span>Nueva cotización</span></div>
+    <div class="nav-item" data-page="quotes"><span class="nav-icon">◈</span><span>Cotizaciones</span></div>
     <div class="nav-divider"></div>
-    <div class="nav-item" data-page="clients"><span class="nav-icon">◎</span><span>Clients</span></div>
-    <div class="nav-item" data-page="catalog"><span class="nav-icon">⊞</span><span>Catalog</span></div>
+    <div class="nav-item" data-page="clients"><span class="nav-icon">◎</span><span>Clientes</span></div>
+    <div class="nav-item" data-page="catalog"><span class="nav-icon">⊞</span><span>Catálogo</span></div>
     <div class="nav-divider"></div>
-    <div class="nav-item" data-page="settings"><span class="nav-icon">⊙</span><span>Settings</span></div>
+    <div class="nav-item" data-page="settings"><span class="nav-icon">⊙</span><span>Ajustes</span></div>
   </div>
   <div class="sidebar-user">
     <div class="sidebar-user-name" id="sidebar-username">—</div>
-    <div class="sidebar-user-logout" onclick="logoutUser()">Sign out</div>
+    <div class="sidebar-user-logout" onclick="logoutUser()">Cerrar sesión</div>
   </div>
 </nav>
 
@@ -273,63 +310,63 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
   <div class="page active" id="page-new-quote">
     <div class="page-header">
       <div>
-        <div class="page-title" id="quote-page-title">New Quote</div>
+        <div class="page-title" id="quote-page-title">Nueva cotización</div>
         <div class="page-sub" id="quote-number-display">QT-0001</div>
       </div>
       <div class="flex gap-12">
-        <button class="btn btn-ghost" onclick="clearQuote()">↺ Clear</button>
-        <button class="btn btn-primary" id="save-draft-btn" onclick="saveQuoteDraft()">Save Draft</button>
-        <button class="btn btn-amber" onclick="openFinishModal()">Finish & Generate PDF ↗</button>
+        <button class="btn btn-ghost" onclick="clearQuote()">↺ Limpiar</button>
+        <button class="btn btn-primary" id="save-draft-btn" onclick="saveQuoteDraft()">Guardar borrador</button>
+        <button class="btn btn-amber" onclick="openFinishModal()">Finalizar y generar PDF ↗</button>
       </div>
     </div>
     <div class="flex gap-12 align-start">
       <div class="flex-1">
         <div class="card">
-          <div class="section-title">Client Info</div>
+          <div class="section-title">Datos del cliente</div>
           <div class="form-row cols-2">
             <div class="form-group">
-              <label class="form-label">Client Name *</label>
-              <input type="text" class="form-input" id="q-client-name" placeholder="e.g. Carlos Rivera" list="clients-datalist" />
+              <label class="form-label">Nombre del cliente *</label>
+              <input type="text" class="form-input" id="q-client-name" placeholder="ej. Carlos Rivera" list="clients-datalist" />
               <datalist id="clients-datalist"></datalist>
             </div>
-            <div class="form-group"><label class="form-label">Phone / WhatsApp</label><input type="text" class="form-input" id="q-client-phone" placeholder="+1 787 000 0000" /></div>
+            <div class="form-group"><label class="form-label">Teléfono / WhatsApp</label><input type="text" class="form-input" id="q-client-phone" placeholder="+1 787 000 0000" /></div>
           </div>
           <div class="form-row cols-2">
-            <div class="form-group"><label class="form-label">Email</label><input type="text" class="form-input" id="q-client-email" placeholder="email@example.com" /></div>
-            <div class="form-group"><label class="form-label">Property Address</label><input type="text" class="form-input" id="q-property" placeholder="Calle X, Municipio, PR" /></div>
+            <div class="form-group"><label class="form-label">Email</label><input type="text" class="form-input" id="q-client-email" placeholder="email@ejemplo.com" /></div>
+            <div class="form-group"><label class="form-label">Dirección de la propiedad</label><input type="text" class="form-input" id="q-property" placeholder="Calle X, Municipio, PR" /></div>
           </div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Internal Notes (not shown on PDF)</label><input type="text" class="form-input" id="q-notes" placeholder="Job site conditions, access info, etc." /></div>
+            <div class="form-group"><label class="form-label">Notas internas (no aparecen en el PDF)</label><input type="text" class="form-input" id="q-notes" placeholder="Condiciones del sitio, acceso, etc." /></div>
           </div>
         </div>
 
         <div class="card mt-16">
-          <div class="section-title">Scope of Work</div>
+          <div class="section-title">Scope del trabajo</div>
           <div class="scope-area">
-            <textarea class="form-textarea" id="q-scope" style="width:100%;border:none;background:transparent;outline:none;font-size:14px;" placeholder="Describe the work needed... e.g. 'Replace 3 interior doors, patch drywall in master bedroom approx 4x4ft, repaint bathroom ceiling'" rows="4"></textarea>
+            <textarea class="form-textarea" id="q-scope" style="width:100%;border:none;background:transparent;outline:none;font-size:14px;" placeholder="Describe the work needed... e.g. 'Replace 3 interior doors, patch drywall in master bedroom approx 4x4ft, repaint bathroom ceiling'" rows="4" oninput="scheduleLiveMeter()"></textarea>
           </div>
           <div class="flex gap-12">
-            <button class="ai-btn" onclick="parseScope()" id="ai-parse-btn"><span>✦</span> Parse with AI <span class="ai-badge">AI</span></button>
-            <button class="btn btn-ghost" onclick="openCatalogPicker()">⊞ Add from Catalog</button>
-            <button class="btn btn-ghost btn-sm" onclick="addBlankLineItem()">+ Add Line Item</button>
+            <button class="ai-btn" onclick="parseScope()" id="ai-parse-btn"><span>✦</span> Analizar con IA <span class="ai-badge">IA</span></button>
+            <button class="btn btn-ghost" onclick="openCatalogPicker()">⊞ Agregar del catálogo</button>
+            <button class="btn btn-ghost btn-sm" onclick="addBlankLineItem()">+ Agregar partida</button>
           </div>
         </div>
 
         <div class="card mt-16">
-          <div class="section-title">Line Items</div>
+          <div class="section-title">Partidas</div>
           <div class="include-row">
-            <label class="include-check"><input type="checkbox" id="inc-materials" checked onchange="liveUpdateTotals()" /> Include Materials</label>
-            <label class="include-check"><input type="checkbox" id="inc-equipment" checked onchange="liveUpdateTotals()" /> Include Equipment</label>
+            <label class="include-check"><input type="checkbox" id="inc-materials" checked onchange="liveUpdateTotals()" /> Incluir materiales</label>
+            <label class="include-check"><input type="checkbox" id="inc-equipment" checked onchange="liveUpdateTotals()" /> Incluir equipo</label>
           </div>
           <div style="overflow-x:auto;">
             <table class="line-table">
               <thead>
                 <tr>
-                  <th style="width:30%">Description</th>
-                  <th style="width:13%">Category</th>
-                  <th style="width:8%">Qty</th>
-                  <th style="width:8%">Unit</th>
-                  <th style="width:16%">Unit Cost</th>
+                  <th style="width:30%">Descripción</th>
+                  <th style="width:13%">Categoría</th>
+                  <th style="width:8%">Cant</th>
+                  <th style="width:8%">Unidad</th>
+                  <th style="width:16%">Costo unit.</th>
                   <th style="width:16%">Total</th>
                   <th style="width:4%"></th>
                 </tr>
@@ -339,33 +376,33 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
           </div>
           <div id="empty-lines" class="empty-state" style="padding:30px 0;">
             <div class="emoji">📋</div>
-            <p>No line items yet. Describe the scope and click Parse, or add manually.</p>
+            <p>Aún no hay partidas. Describe el scope y dale Analizar, o agrégalas a mano.</p>
           </div>
         </div>
       </div>
 
       <!-- TOTALS -->
       <div class="totals-panel" style="position:sticky;top:20px;">
-        <div class="totals-title">Estimate</div>
-        <div class="totals-row"><span>Labor</span><span id="t-labor">$0.00</span></div>
-        <div class="totals-row" id="tr-materials"><span>Materials</span><span id="t-materials">$0.00</span></div>
-        <div class="totals-row" id="tr-equipment"><span>Equipment</span><span id="t-equipment">$0.00</span></div>
-        <div class="totals-row"><span style="color:rgba(255,255,255,0.3)">Subtotal (cost)</span><span id="t-subtotal" style="color:rgba(255,255,255,0.35)">$0.00</span></div>
+        <div class="totals-title">Estimado</div>
+        <div class="totals-row"><span>Mano de obra</span><span id="t-labor">$0.00</span></div>
+        <div class="totals-row" id="tr-materials"><span>Materiales</span><span id="t-materials">$0.00</span></div>
+        <div class="totals-row" id="tr-equipment"><span>Equipo</span><span id="t-equipment">$0.00</span></div>
+        <div class="totals-row"><span style="color:rgba(255,255,255,0.3)">Subtotal (costo)</span><span id="t-subtotal" style="color:rgba(255,255,255,0.35)">$0.00</span></div>
         <div class="totals-row total"><span>TOTAL</span><span id="t-total">$0.00</span></div>
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);">
-          <div class="margin-label" style="margin-bottom:6px;">Override Total (optional)</div>
+          <div class="margin-label" style="margin-bottom:6px;">Precio manual (opcional)</div>
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="color:rgba(255,255,255,0.4);font-size:14px;">$</span>
             <input class="margin-input" type="number" id="total-override" placeholder="e.g. 1500"
               style="width:100%;text-align:left;" oninput="onOverrideInput()" />
           </div>
-          <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:5px;">Leave blank to use calculated total</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:5px;">Déjalo en blanco para usar el total calculado</div>
         </div>
         <div class="margin-controls">
-          <div class="margin-label">Margins</div>
-          <div class="margin-row"><label>Labor %</label><input class="margin-input" type="number" id="margin-labor" value="40" min="0" max="100" oninput="liveUpdateTotals()" /></div>
-          <div class="margin-row"><label>Materials %</label><input class="margin-input" type="number" id="margin-materials" value="25" min="0" max="100" oninput="liveUpdateTotals()" /></div>
-          <div class="margin-row"><label>Equipment %</label><input class="margin-input" type="number" id="margin-equipment" value="25" min="0" max="100" oninput="liveUpdateTotals()" /></div>
+          <div class="margin-label">Márgenes</div>
+          <div class="margin-row"><label>Mano de obra %</label><input class="margin-input" type="number" id="margin-labor" value="40" min="0" max="100" oninput="liveUpdateTotals()" /></div>
+          <div class="margin-row"><label>Materiales %</label><input class="margin-input" type="number" id="margin-materials" value="25" min="0" max="100" oninput="liveUpdateTotals()" /></div>
+          <div class="margin-row"><label>Equipo %</label><input class="margin-input" type="number" id="margin-equipment" value="25" min="0" max="100" oninput="liveUpdateTotals()" /></div>
         </div>
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.08);">
           <div class="margin-row">
@@ -377,8 +414,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
           </div>
           <div class="totals-row total" id="tr-total-ivu" style="display:none;margin-top:4px;"><span>TOTAL + IVU</span><span id="t-total-ivu">$0.00</span></div>
         </div>
+        <!-- LIVE PRICE METER -->
+        <div class="live-meter" id="live-meter">
+          <div class="live-meter-label">✦ Medidor de precio <span class="ai-badge" style="background:var(--teal);color:var(--dark);">EN VIVO</span></div>
+          <div id="live-meter-body">
+            <div class="lm-note">Escribe el scope y los precios para ver si tu cotización está en el rango que suele cerrar.</div>
+          </div>
+        </div>
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08);">
-          <div class="margin-label">Valid Until</div>
+          <div class="margin-label">Válida hasta</div>
           <input type="date" class="form-input" id="q-valid-until" style="background:rgba(255,255,255,0.07);border-color:rgba(255,255,255,0.12);color:white;font-size:12px;" />
         </div>
       </div>
@@ -388,25 +432,26 @@ body { font-family: 'DM Sans', sans-serif; background: var(--off-white); color: 
   <!-- QUOTES LIST -->
   <div class="page" id="page-quotes">
     <div class="page-header">
-      <div><div class="page-title">Quotes</div><div class="page-sub" id="quotes-count">Loading...</div></div>
-      <button class="btn btn-amber" onclick="showPage('new-quote')">+ New Quote</button>
+      <div><div class="page-title">Cotizaciones</div><div class="page-sub" id="quotes-count">Cargando...</div></div>
+      <button class="btn btn-amber" onclick="showPage('new-quote')">+ Nueva cotización</button>
     </div>
     <div class="stats-row">
-      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Quotes</div></div>
-      <div class="stat-card highlight"><div class="stat-num" id="stat-revenue">—</div><div class="stat-label">Approved Revenue</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-approved">—</div><div class="stat-label">Approved</div></div>
-      <div class="stat-card"><div class="stat-num" id="stat-pending">—</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Cotizaciones</div></div>
+      <div class="stat-card highlight"><div class="stat-num" id="stat-revenue">—</div><div class="stat-label">Ingreso aprobado</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-approved">—</div><div class="stat-label">Aprobadas</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-pending">—</div><div class="stat-label">Esperando</div></div>
     </div>
     <div class="search-bar">
       <span class="search-icon">⌕</span>
-      <input type="text" placeholder="Search by client, description..." id="quotes-search" oninput="renderQuotesList()" />
-      <select class="form-select" id="quotes-filter" style="border:none;width:160px;font-size:13px;" onchange="renderQuotesList()">
-        <option value="open" selected>Open · Action needed</option>
-        <option value="">All Status</option>
-        <option value="draft">Draft</option>
-        <option value="sent">Sent</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
+      <input type="text" placeholder="Buscar por cliente, scope..." id="quotes-search" oninput="renderQuotesList()" />
+      <select class="form-select" id="quotes-filter" style="border:none;width:180px;font-size:13px;" onchange="renderQuotesList()">
+        <option value="open" selected>⚡ Cola de trabajo</option>
+        <option value="">Todas</option>
+        <option value="shadow">Borradores IA</option>
+        <option value="draft">Borradores</option>
+        <option value="sent">Enviadas</option>
+        <option value="approved">Aprobadas</option>
+        <option value="rejected">Rechazadas</option>
       </select>
     </div>
     <div class="quote-list" id="quotes-list"></div>
@@ -851,7 +896,7 @@ function renderStats() {
   document.getElementById('stat-revenue').textContent = '$' + (rev >= 1000 ? (rev/1000).toFixed(1)+'k' : rev.toFixed(0));
   document.getElementById('stat-approved').textContent = quotesCache.filter(q => q.status === 'approved').length;
   document.getElementById('stat-pending').textContent = quotesCache.filter(q => q.status === 'sent').length;
-  document.getElementById('quotes-count').textContent = `${quotesCache.length} quotes total`;
+  document.getElementById('quotes-count').textContent = `${quotesCache.length} cotizaciones en total`;
 }
 
 // Price-meter gauge — reads quotes.price_band written by the lead-owner agent.
@@ -869,54 +914,180 @@ function priceBandPill(pb) {
   return `<span class="price-band" title="${note}" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;color:${m.c};background:${m.b};white-space:nowrap;">${m.t}</span>`;
 }
 
+// ============================================================
+// WORK QUEUE — action-first list grouped by what Cotto needs to do.
+// Default view ("open") = needs-action queue with three buckets:
+//   • Por cotizar   = status 'shadow' (bot pre-drafts from COTIZAR scope visits),
+//                     on a 24h clock from created_at (countdown).
+//   • Por enviar    = status 'draft' (ready to send).
+//   • Esperando respuesta = status 'sent' (awaiting the client).
+// Other filter values fall back to a flat list of the same compact cards.
+// ============================================================
+const QUEUE_GROUPS = [
+  { key: 'shadow', emoji: '🧾', title: 'Por cotizar',          empty: 'Nada pendiente de cotizar.' },
+  { key: 'draft',  emoji: '✉️', title: 'Por enviar',           empty: 'No tienes borradores listos.' },
+  { key: 'sent',   emoji: '⏳', title: 'Esperando respuesta',  empty: 'Nadie pendiente de responder.' },
+];
+
+function quoteMatchesSearch(quote, q) {
+  return !q || (quote.client_name||'').toLowerCase().includes(q)
+            || (quote.scope||'').toLowerCase().includes(q)
+            || (quote.quote_number||'').toLowerCase().includes(q);
+}
+
+function formatCountdown(createdAt) {
+  const deadline = new Date(createdAt).getTime() + 24 * 3600 * 1000;
+  const ms = deadline - Date.now();
+  if (ms <= 0) {
+    const over = Math.floor(-ms / 3600000);
+    return { text: `⚠️ Vencido${over > 0 ? ' ' + over + 'h' : ''}`, cls: 'over', urgent: true };
+  }
+  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+  return { text: `⏳ ${h > 0 ? h + 'h ' : ''}${m}m`, cls: ms < 4 * 3600000 ? 'warn' : '', urgent: ms < 4 * 3600000 };
+}
+
+function statusSelectHtml(quote) {
+  return `<select class="form-select" style="width:120px;font-size:12px;padding:5px 8px;" onchange="updateQuoteStatus('${quote.id}',this.value)" onclick="event.stopPropagation()">
+      <option value="draft" ${quote.status==='draft'?'selected':''}>Borrador</option>
+      <option value="sent" ${quote.status==='sent'?'selected':''}>Enviada</option>
+      <option value="approved" ${quote.status==='approved'?'selected':''}>Aprobada</option>
+      <option value="rejected" ${quote.status==='rejected'?'selected':''}>Rechazada</option>
+      ${quote.status==='shadow'?'<option value="shadow" selected>Borrador IA</option>':''}
+    </select>`;
+}
+function lifecycleSelectHtml(quote) {
+  return `<select class="form-select" style="width:130px;font-size:12px;padding:5px 8px;" onchange="updateQuoteLifecycle('${quote.id}',this.value)" onclick="event.stopPropagation()" ${quote.status!=='approved'?'disabled':''} title="${quote.status!=='approved'?'Solo disponible cuando está Aprobada':'Marcar reservada o facturada'}">
+      <option value="" ${!quote.lifecycle_stage?'selected':''}>—</option>
+      <option value="booked" ${quote.lifecycle_stage==='booked'?'selected':''}>📅 Reservada</option>
+      <option value="invoiced" ${quote.lifecycle_stage==='invoiced'?'selected':''}>💰 Facturada</option>
+    </select>`;
+}
+
+function primaryActionHtml(quote) {
+  const id = quote.id;
+  if (quote.status === 'shadow')
+    return `<button class="btn btn-amber btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${id}')">Cotizar →</button>`;
+  if (quote.status === 'draft')
+    return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();markSent('${id}')">Enviar →</button>`;
+  if (quote.status === 'sent')
+    return `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();toggleQExpand(this)">Registrar respuesta</button>`;
+  return `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${id}')">Abrir</button>`;
+}
+
+function quoteDetailHtml(quote) {
+  let resp = '';
+  if (quote.status === 'sent') {
+    resp = `<div class="q-resp">
+      <button class="btn btn-green btn-sm" onclick="event.stopPropagation();updateQuoteStatus('${quote.id}','approved')">✓ Aprobada</button>
+      <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();updateQuoteStatus('${quote.id}','rejected')">✗ Rechazada</button>
+    </div>`;
+  }
+  return `${resp}<div class="q-detail-controls">
+      ${statusSelectHtml(quote)}
+      ${lifecycleSelectHtml(quote)}
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Eliminar</button>
+    </div>`;
+}
+
+function quoteCard(quote) {
+  const el = document.createElement('div');
+  el.className = 'q-card';
+  const cd = quote.status === 'shadow' ? formatCountdown(quote.created_at) : null;
+  if (cd && cd.urgent) el.classList.add('urgent');
+  const gauge = priceBandPill(quote.price_band);
+  el.innerHTML = `
+    <div class="q-main">
+      <div class="q-info" style="cursor:pointer;" onclick="loadQuoteForEditing('${quote.id}')">
+        <div class="q-client">${esc(quote.client_name||'—')} <span class="q-num">${esc(quote.quote_number||'')}</span></div>
+        <div class="q-scope">${esc(quote.scope || 'Sin scope')}</div>
+      </div>
+      <div class="q-meta">
+        ${cd ? `<span class="countdown ${cd.cls}" id="cd-${quote.id}">${cd.text}</span>` : ''}
+        ${quote.grand_total ? `<span class="q-price">$${(quote.grand_total||0).toFixed(0)}</span>` : ''}
+        ${gauge}
+        ${primaryActionHtml(quote)}
+        <button class="q-expand-btn" onclick="toggleQExpand(this)" title="Más opciones">⋯</button>
+      </div>
+    </div>
+    <div class="q-detail">${quoteDetailHtml(quote)}</div>`;
+  return el;
+}
+
+function toggleQExpand(btn) {
+  const card = btn.closest('.q-card');
+  if (card) card.classList.toggle('open');
+}
+
+async function markSent(id) {
+  const { error } = await sb.from('quotes').update({ status: 'sent' }).eq('id', id);
+  if (error) {
+    toast(/missing both client_phone and client_email/i.test(error.message||'')
+      ? 'Agrega teléfono o email antes de enviar.' : 'No se pudo enviar: ' + error.message, 'error');
+    return;
+  }
+  const qq = quotesCache.find(x => x.id === id);
+  if (qq) qq.status = 'sent';
+  renderStats();
+  renderQuotesList();
+  toast('Marcada como enviada.', 'success');
+}
+
+let countdownTimer = null;
+function startCountdownTimer() {
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    document.querySelectorAll('[id^="cd-"]').forEach(span => {
+      const qq = quotesCache.find(x => x.id === span.id.slice(3));
+      if (!qq) return;
+      const cd = formatCountdown(qq.created_at);
+      span.textContent = cd.text;
+      span.className = 'countdown ' + cd.cls;
+    });
+  }, 60000);
+}
+
 function renderQuotesList() {
   const q = (document.getElementById('quotes-search')?.value || '').toLowerCase();
   const filter = document.getElementById('quotes-filter')?.value || '';
-  const quotes = quotesCache.filter(quote => {
-    const mQ = !q || (quote.client_name||'').toLowerCase().includes(q) || (quote.scope||'').toLowerCase().includes(q) || (quote.quote_number||'').toLowerCase().includes(q);
-    let mF;
-    if (filter === 'open') {
-      // Open = needs action by Cotto: drafts (need to send), sent (awaiting reply),
-      // and approved quotes that haven't been booked or invoiced yet.
-      // Hide: rejected, and approved+booked / approved+invoiced (already handled).
-      if (quote.status === 'rejected') mF = false;
-      else if (quote.status === 'approved' && (quote.lifecycle_stage === 'booked' || quote.lifecycle_stage === 'invoiced')) mF = false;
-      else mF = true;
-    } else {
-      mF = !filter || quote.status === filter;
-    }
-    return mQ && mF;
-  });
   const list = document.getElementById('quotes-list');
   list.innerHTML = '';
-  if (quotes.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">📄</div><p>No quotes found.</p></div>'; return; }
-  quotes.forEach(quote => {
-    const el = document.createElement('div');
-    el.className = 'quote-card';
-    el.style.cursor = 'pointer';
-    el.onclick = () => loadQuoteForEditing(quote.id);
-    el.innerHTML = `
-      <div class="quote-card-num">${quote.quote_number}</div>
-      <div class="quote-card-client">${esc(quote.client_name||'—')}</div>
-      <div class="quote-card-desc">${esc((quote.scope||'—').substring(0,70))}</div>
-      <span class="status-badge status-${quote.status}">${quote.status}</span>
-      <div class="quote-card-amount">$${(quote.grand_total||0).toFixed(0)}</div>
-      ${priceBandPill(quote.price_band)}
-      <select class="form-select" style="width:110px;font-size:12px;padding:5px 8px;" onchange="updateQuoteStatus('${quote.id}',this.value)" onclick="event.stopPropagation()">
-        <option value="draft" ${quote.status==='draft'?'selected':''}>Draft</option>
-        <option value="sent" ${quote.status==='sent'?'selected':''}>Sent</option>
-        <option value="approved" ${quote.status==='approved'?'selected':''}>Approved</option>
-        <option value="rejected" ${quote.status==='rejected'?'selected':''}>Rejected</option>
-      </select>
-      <select class="form-select" style="width:120px;font-size:12px;padding:5px 8px;" onchange="updateQuoteLifecycle('${quote.id}',this.value)" onclick="event.stopPropagation()" ${quote.status!=='approved'?'disabled':''} title="${quote.status!=='approved'?'Only available when Approved':'Mark booked or invoiced'}">
-        <option value="" ${!quote.lifecycle_stage?'selected':''}>—</option>
-        <option value="booked" ${quote.lifecycle_stage==='booked'?'selected':''}>📅 Booked</option>
-        <option value="invoiced" ${quote.lifecycle_stage==='invoiced'?'selected':''}>💰 Invoiced</option>
-      </select>
-      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Edit</button>
-      <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Delete</button>`;
-    list.appendChild(el);
-  });
+
+  if (filter === 'open') {
+    // Grouped work queue (default view).
+    let any = false;
+    QUEUE_GROUPS.forEach(g => {
+      const items = quotesCache
+        .filter(x => x.status === g.key && quoteMatchesSearch(x, q))
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)); // oldest = most urgent first
+      const group = document.createElement('div');
+      group.className = 'queue-group';
+      group.innerHTML = `<div class="queue-head"><span class="queue-emoji">${g.emoji}</span>
+        <span class="queue-title">${g.title}</span><span class="queue-count">${items.length}</span></div>`;
+      if (items.length === 0) {
+        const e = document.createElement('div'); e.className = 'queue-empty'; e.textContent = g.empty;
+        group.appendChild(e);
+      } else {
+        any = true;
+        items.forEach(quote => group.appendChild(quoteCard(quote)));
+      }
+      list.appendChild(group);
+    });
+    if (!any && !q) {
+      list.insertAdjacentHTML('beforeend',
+        '<div class="empty-state"><div class="emoji">✅</div><p>Todo al día — no hay nada pendiente.</p></div>');
+    }
+    startCountdownTimer();
+    return;
+  }
+
+  // Flat list for a specific status / all statuses.
+  const quotes = quotesCache.filter(quote => quoteMatchesSearch(quote, q) && (!filter || quote.status === filter));
+  if (quotes.length === 0) { list.innerHTML = '<div class="empty-state"><div class="emoji">📄</div><p>No se encontraron cotizaciones.</p></div>'; return; }
+  const wrap = document.createElement('div'); wrap.className = 'queue-group';
+  quotes.forEach(quote => wrap.appendChild(quoteCard(quote)));
+  list.appendChild(wrap);
+  startCountdownTimer();
 }
 
 async function updateQuoteStatus(id, status) {
@@ -983,13 +1154,14 @@ async function loadQuoteForEditing(id) {
   document.getElementById('margin-equipment').value = quote.margin_equipment || 25;
 
   // Update UI to show edit mode
-  document.getElementById('quote-page-title').textContent = 'Edit Quote';
+  document.getElementById('quote-page-title').textContent = quote.status === 'shadow' ? 'Cotizar (borrador IA)' : 'Editar cotización';
   document.getElementById('quote-number-display').textContent = quote.quote_number;
-  document.getElementById('save-draft-btn').textContent = 'Update Quote';
+  document.getElementById('save-draft-btn').textContent = 'Actualizar cotización';
 
   renderLineItems();
   showPage('new-quote');
-  toast(`Editing ${quote.quote_number}`, 'success');
+  scheduleLiveMeter();
+  toast(`Editando ${quote.quote_number}`, 'success');
 }
 
 // ============================================================
@@ -1014,9 +1186,10 @@ function clearQuote() {
   editingQuoteId = null;
   currentLineItems = [];
   ['q-client-name','q-client-phone','q-client-email','q-property','q-notes','q-scope','total-override'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  document.getElementById('quote-page-title').textContent = 'New Quote';
-  document.getElementById('save-draft-btn').textContent = 'Save Draft';
+  document.getElementById('quote-page-title').textContent = 'Nueva cotización';
+  document.getElementById('save-draft-btn').textContent = 'Guardar borrador';
   setDefaultNewQuote();
+  renderLiveMeterIdle('Escribe el scope y los precios para ver si tu cotización está en el rango que suele cerrar.');
   renderLineItems();
 }
 
@@ -1062,9 +1235,9 @@ function renderLineItems() {
     tr.innerHTML = `
       <td><input value="${esc(item.description)}" placeholder="Description" oninput="updateLineItem('${item.id}','description',this.value)" /></td>
       <td><select onchange="updateLineItem('${item.id}','category',this.value);renderLineItems();">
-        <option value="labor" ${item.category==='labor'?'selected':''}>Labor</option>
-        <option value="materials" ${item.category==='materials'?'selected':''}>Materials</option>
-        <option value="equipment" ${item.category==='equipment'?'selected':''}>Equipment</option>
+        <option value="labor" ${item.category==='labor'?'selected':''}>Mano de obra</option>
+        <option value="materials" ${item.category==='materials'?'selected':''}>Materiales</option>
+        <option value="equipment" ${item.category==='equipment'?'selected':''}>Equipo</option>
       </select></td>
       <td><input type="number" value="${item.quantity}" min="0" step="0.5" oninput="updateLineItemLive('${item.id}','quantity',this.value,this)" style="width:70px;" /></td>
       <td><input value="${esc(item.unit)}" placeholder="hr..." onchange="updateLineItem('${item.id}','unit',this.value)" style="width:70px;" /></td>
@@ -1112,6 +1285,85 @@ function liveUpdateTotals() {
   document.getElementById('tr-total-ivu').style.display = incIVU ? 'flex' : 'none';
   document.getElementById('tr-materials').style.opacity = incMat ? '1' : '0.4';
   document.getElementById('tr-equipment').style.opacity = incEq ? '1' : '0.4';
+  scheduleLiveMeter();
+}
+
+// ============================================================
+// LIVE PRICE METER — calls price-band-live (embeds scope + reuses the SQL core)
+// debounced; caches the scope embedding so price-only edits skip re-embedding.
+// ============================================================
+let liveMeterTimer = null, liveMeterSeq = 0;
+let liveMeterScope = null, liveMeterEmbedding = null;
+
+const LM_BANDS = {
+  fair:              { t: '🟢 Precio OK',      c: '#1a7f37', b: '#e6f4ea' },
+  high:              { t: '🔴 Precio alto',    c: '#b3261e', b: '#fce8e6' },
+  low:               { t: '🟡 Revisar precio', c: '#8a6d00', b: '#fef7e0' },
+  insufficient_data: { t: '⚪ Pocos datos',    c: '#888',    b: '#eef1f8' },
+  no_data:           { t: '⚪ Sin datos',      c: '#888',    b: '#eef1f8' },
+};
+
+function scheduleLiveMeter() {
+  // Only relevant on the New Quote screen.
+  if (!document.getElementById('page-new-quote')?.classList.contains('active')) return;
+  clearTimeout(liveMeterTimer);
+  liveMeterTimer = setTimeout(runLiveMeter, 700);
+}
+
+function renderLiveMeterIdle(msg) {
+  document.getElementById('live-meter-body').innerHTML = `<div class="lm-note">${esc(msg)}</div>`;
+}
+function renderLiveMeterLoading() {
+  document.getElementById('live-meter-body').innerHTML =
+    `<div class="lm-spin"><span class="spinner" style="width:14px;height:14px;"></span> Calculando…</div>`;
+}
+function renderLiveMeter(pb) {
+  const m = LM_BANDS[pb.band] || LM_BANDS.no_data;
+  let html = `<span class="lm-pill" style="color:${m.c};background:${m.b};">${m.t}</span>`;
+  if (pb.won_count >= 2 && pb.won_low && pb.won_high) {
+    html += `<div class="lm-range">Suelen cerrar: $${pb.won_low}–$${pb.won_high}` +
+            (pb.won_median ? ` · mediana $${pb.won_median}` : '') + `</div>`;
+  }
+  if (pb.note) html += `<div class="lm-note">${esc(pb.note)}` +
+    (pb.confidence ? ` · confianza ${pb.confidence}` : '') + `</div>`;
+  document.getElementById('live-meter-body').innerHTML = html;
+}
+
+async function runLiveMeter() {
+  const scope = (document.getElementById('q-scope')?.value || '').trim();
+  const t = buildTotals();
+  if (currentLineItems.length === 0 || !(t.grandTotal > 0)) {
+    renderLiveMeterIdle('Escribe el scope y los precios para ver si tu cotización está en el rango que suele cerrar.');
+    return;
+  }
+  if (!scope) { renderLiveMeterIdle('Agrega el scope del trabajo para comparar con cotizaciones similares.'); return; }
+
+  const seq = ++liveMeterSeq;
+  renderLiveMeterLoading();
+
+  const body = {
+    grand_total: t.grandTotal,
+    total_labor: t.labor, total_materials: t.materials, total_equipment: t.equipment,
+    margin_labor: t.mLab, margin_materials: t.mMat, margin_equipment: t.mEq,
+  };
+  // Reuse cached embedding when the scope text hasn't changed (price-only edits).
+  if (scope === liveMeterScope && Array.isArray(liveMeterEmbedding)) body.embedding = liveMeterEmbedding;
+  else body.scope = scope;
+
+  try {
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/price-band-live', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (seq !== liveMeterSeq) return; // a newer request superseded this one
+    if (data.error) { renderLiveMeterIdle('No se pudo calcular el medidor ahora.'); return; }
+    if (Array.isArray(data.embedding)) { liveMeterEmbedding = data.embedding; liveMeterScope = scope; }
+    renderLiveMeter(data);
+  } catch (e) {
+    if (seq === liveMeterSeq) renderLiveMeterIdle('No se pudo calcular el medidor ahora.');
+  }
 }
 
 // ============================================================
