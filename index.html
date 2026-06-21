@@ -1798,212 +1798,170 @@ async function buildAndDownloadPDF(snap, qNum, t) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, mg = 18;
-  let y = mg;
   const s = settingsCache;
+  // Brand palette
+  const NAVY=[20,37,67], BLUE=[54,82,165], LIME=[214,226,100], CYAN=[139,215,215],
+        MID=[122,138,170], INK=[40,55,80], OFF=[247,248,252];
+  const setT=(c)=>doc.setTextColor(c[0],c[1],c[2]);
+  const setF=(c)=>doc.setFillColor(c[0],c[1],c[2]);
 
-  // Header — white background, clean minimal
-  doc.setFillColor(255,255,255);
-  doc.rect(0,0,W,52,'F');
-  doc.setFillColor(54,82,165);
-  doc.rect(0,52,W,1,'F');
-
-  // Logo — loaded via canvas trick for jsPDF compatibility
+  // ===== Header band (navy) =====
+  setF(NAVY); doc.rect(0,0,W,46,'F');
   try {
-    const { dataURL: logoDataURL, w: logoW, h: logoH } = await loadImageAsDataURL('https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png');
-    const targetH = 35;
-    const targetW = targetH * (logoW / logoH);
-    doc.addImage(logoDataURL, 'PNG', mg, 6, targetW, targetH);
+    const { dataURL, w:lw, h:lh } = await loadImageAsDataURL('https://dp3d2hb4975es.cloudfront.net/uploads/domo/2026/6/1/1780335566logosmall1.png');
+    const targetH = 20, targetW = targetH*(lw/lh);
+    doc.addImage(dataURL,'PNG',mg,12,targetW,targetH);
   } catch(e) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(20,37,67);
-    doc.text('domo', mg, 28);
+    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT([255,255,255]); doc.text('domo', mg, 28);
   }
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(LIME);
+  doc.text('Tu lista del hogar, resuelta.', mg, 40);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); setT(CYAN);
+  doc.text('(787) 419-0300', W-mg, 16, {align:'right'});
+  setT([255,255,255]);
+  doc.text('info@domoyourhome.com', W-mg, 22, {align:'right'});
+  doc.text('domoyourhome.com', W-mg, 28, {align:'right'});
+  // lime accent under header
+  setF(LIME); doc.rect(0,46,W,1.6,'F');
 
-  // Tagline below logo
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(54,82,165);
-  doc.text('Cuidar tu casa en Puerto Rico nunca había sido tan fácil.', mg, 46);
+  let y = 58;
 
-  // Contact right-aligned
-  const phone = '(787) 419-0300';
-  const email = 'info@domoyourhome.com';
-  const website = 'domoyourhome.com';
-  doc.setTextColor(120,135,160); doc.setFontSize(8);
-  doc.text(`${phone}  ·  ${email}`, W-mg, 20, {align:'right'});
-  doc.text(website, W-mg, 28, {align:'right'});
-
-  y = 58;
-
-  // Quote info
-  doc.setFillColor(247,248,252);
-  doc.rect(0,y,W,16,'F');
-  doc.setFillColor(226,231,240);
-  doc.rect(0,y+16,W,0.5,'F');
-  doc.setTextColor(20,37,67);
-  const infoItems = [
-    { label:'QUOTE', val: qNum },
-    { label:'DATE', val: new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) },
-    { label:'VALID UNTIL', val: snap.validUntil || '—' },
-  ];
-  infoItems.forEach((item,i) => {
-    const x = mg + 4 + i*58;
-    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(100,115,140);
-    doc.text(item.label, x, y+6);
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(20,37,67);
-    doc.text(item.val, x, y+13);
+  // ===== Quote meta row =====
+  const dateStr = new Date().toLocaleDateString('es-ES',{year:'numeric',month:'short',day:'numeric'});
+  const meta = [['COTIZACIÓN', qNum], ['FECHA', dateStr], ['VÁLIDA HASTA', snap.validUntil || '—']];
+  meta.forEach(([label,val],i) => {
+    const x = mg + i*60;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text(label, x, y);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); setT(NAVY); doc.text(String(val), x, y+6);
   });
-  y += 24;
+  y += 12;
+  doc.setDrawColor(226,231,240); doc.line(mg, y, W-mg, y); y += 9;
 
-  // Client
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,115,140);
-  doc.text('PREPARED FOR', mg, y);
-  y += 6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,37,67);
-  doc.text(snap.clientName, mg, y); y += 5;
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(80,95,120);
+  // ===== Prepared for =====
+  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text('PARA', mg, y); y += 6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(NAVY); doc.text(snap.clientName, mg, y); y += 5;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); setT([80,95,120]);
   if (snap.clientProperty) { doc.text(snap.clientProperty, mg, y); y += 4.5; }
   if (snap.clientPhone) { doc.text(snap.clientPhone, mg, y); y += 4.5; }
   if (snap.clientEmail) { doc.text(snap.clientEmail, mg, y); y += 4.5; }
   y += 8;
 
-  // Scope (adaptive — keeps the totals + footer on ONE page)
+  // ===== Scope (adaptive — keeps totals + footer on ONE page) =====
+  const footerY = 263;
   if (snap.scope) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(100,115,140);
-    doc.text('SCOPE OF WORK', mg, y); y += 5;
-    doc.setFont('helvetica','normal'); doc.setTextColor(40,55,80);
-    const footerY = 263;
-    const totalsH = snap.incIVU ? 52 : 26;
-    let belowScope = totalsH + 8;
-    if (pdfStyle === 'lumpsum') {
-      belowScope += 26;
-    } else if (pdfStyle === 'itemized') {
-      const visN = snap.lineItems.filter(it => !(it.category === 'materials' && !snap.incMat) && !(it.category === 'equipment' && !snap.incEq)).length;
-      belowScope += 7 + visN * 6.5;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text('TRABAJO A REALIZAR', mg, y); y += 5;
+    const totalsH = snap.incIVU ? 44 : 26;
+    let belowScope = totalsH + 10;
+    if (pdfStyle === 'lumpsum') belowScope += 26;
+    else if (pdfStyle === 'itemized') {
+      const visN = snap.lineItems.filter(it => !(it.category==='materials'&&!snap.incMat) && !(it.category==='equipment'&&!snap.incEq)).length;
+      belowScope += 7 + visN*6.5;
     } else {
-      const rowN = 1 + (snap.incMat ? 1 : 0) + (snap.incEq ? 1 : 0);
-      belowScope += 7 + rowN * 7;
+      const rowN = 1 + (snap.incMat?1:0) + (snap.incEq?1:0);
+      belowScope += 7 + rowN*7;
     }
     const scopeAvail = Math.max(16, (footerY - 6 - belowScope) - y);
-    let fs = 9, lineH = 4.8;
-    doc.setFontSize(fs);
-    let scopeLines = doc.splitTextToSize(snap.scope, W-mg*2);
-    while (scopeLines.length * lineH > scopeAvail && fs > 6) {
-      fs -= 0.5; lineH = fs * 0.533;
-      doc.setFontSize(fs);
-      scopeLines = doc.splitTextToSize(snap.scope, W-mg*2);
+    let fs = 9.5, lineH = 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(fs);
+    let scopeLines = doc.splitTextToSize(snap.scope, W-mg*2-10);
+    while (scopeLines.length*lineH > scopeAvail && fs > 6) {
+      fs -= 0.5; lineH = fs*0.55; doc.setFontSize(fs);
+      scopeLines = doc.splitTextToSize(snap.scope, W-mg*2-10);
     }
-    doc.setFontSize(fs);
-    scopeLines.forEach(line => { doc.text(line, mg, y); y += lineH; });
-    y += 6;
+    const boxH = scopeLines.length*lineH + 7;
+    setF(OFF); doc.roundedRect(mg, y-1, W-mg*2, boxH, 2.2, 2.2, 'F');
+    setF(CYAN); doc.rect(mg, y-1, 1.6, boxH, 'F');
+    setT(INK); doc.setFontSize(fs);
+    let ty = y + 5; scopeLines.forEach(line => { doc.text(line, mg+6, ty); ty += lineH; });
+    y += boxH + 8;
   }
 
-  // Table header — skip for lump sum
+  // ===== Items / breakdown =====
   if (pdfStyle !== 'lumpsum') {
-    doc.setFillColor(54,82,165);
-    doc.rect(mg,y,W-mg*2,7,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    setF(NAVY); doc.roundedRect(mg, y, W-mg*2, 7.5, 1.2, 1.2, 'F');
+    setT([255,255,255]); doc.setFont('helvetica','bold'); doc.setFontSize(8);
     if (pdfStyle === 'itemized') {
-      doc.text('DESCRIPTION', mg+3, y+4.8);
-      doc.text('CAT', mg+82, y+4.8);
-      doc.text('QTY', mg+100, y+4.8);
-      doc.text('UNIT', mg+112, y+4.8);
-      doc.text('UNIT COST', mg+126, y+4.8);
-      doc.text('TOTAL', W-mg-3, y+4.8, {align:'right'});
+      doc.text('DESCRIPCIÓN', mg+3, y+5);
+      doc.text('CANT', mg+100, y+5);
+      doc.text('UNIDAD', mg+112, y+5);
+      doc.text('COSTO', mg+126, y+5);
+      doc.text('TOTAL', W-mg-3, y+5, {align:'right'});
     } else {
-      doc.text('CATEGORY', mg+3, y+4.8);
-      doc.text('AMOUNT', W-mg-3, y+4.8, {align:'right'});
+      doc.text('CONCEPTO', mg+3, y+5);
+      doc.text('MONTO', W-mg-3, y+5, {align:'right'});
     }
-    y += 7;
+    y += 7.5;
   }
 
   if (pdfStyle === 'lumpsum') {
-    // Lump sum: just show scope description and one total, no breakdown
     y += 10;
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(20,37,67);
-    doc.text('Professional services as described above.', mg+3, y);
-    y += 6;
-    doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(120,135,160);
-    const inclParts = ['labor'];
-    if (snap.incMat === true) inclParts.push('materials');
-    if (snap.incEq === true) inclParts.push('equipment');
-    const inclusionStr = 'Includes ' + inclParts.join(', ') + ' required to complete the work.';
-    doc.text(inclusionStr, mg+3, y);
-    y += 10;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); setT(NAVY);
+    doc.text('Servicios profesionales según el trabajo descrito.', mg+1, y); y += 6;
+    doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(MID);
+    const incl = ['mano de obra'];
+    if (snap.incMat===true) incl.push('materiales');
+    if (snap.incEq===true) incl.push('equipo');
+    doc.text('Incluye ' + incl.join(', ') + ' para completar el trabajo.', mg+1, y); y += 10;
   } else if (pdfStyle === 'itemized') {
     const visible = snap.lineItems.filter(i => !(i.category==='materials'&&!snap.incMat) && !(i.category==='equipment'&&!snap.incEq));
     visible.forEach((item,i) => {
-      if (i%2===0) { doc.setFillColor(247,248,252); doc.rect(mg,y-1,W-mg*2,6.5,'F'); }
-      doc.setTextColor(20,37,67); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-      doc.text(doc.splitTextToSize(item.description,78)[0], mg+3, y+3.5);
-      doc.text(item.category.charAt(0).toUpperCase()+item.category.slice(1), mg+82, y+3.5);
+      if (i%2===0) { setF(OFF); doc.rect(mg,y-1,W-mg*2,6.5,'F'); }
+      setT(NAVY); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+      doc.text(doc.splitTextToSize(item.description,80)[0], mg+3, y+3.5);
       doc.text(String(item.quantity), mg+100, y+3.5);
       doc.text(item.unit||'', mg+112, y+3.5);
       doc.text('$'+item.unit_cost.toFixed(2), mg+126, y+3.5);
       doc.text('$'+(item.quantity*item.unit_cost).toFixed(2), W-mg-3, y+3.5, {align:'right'});
-      doc.setDrawColor(226,231,240); doc.line(mg,y+5.5,W-mg,y+5.5);
       y += 6.5;
     });
   } else {
     const rows = [
-      {label:'Labor', val:t.labor},
-      ...(snap.incMat?[{label:'Materials',val:t.materials}]:[]),
-      ...(snap.incEq?[{label:'Equipment',val:t.equipment}]:[]),
+      {label:'Mano de obra', val:t.labor},
+      ...(snap.incMat?[{label:'Materiales',val:t.materials}]:[]),
+      ...(snap.incEq?[{label:'Equipo',val:t.equipment}]:[]),
     ];
     rows.forEach((row,i) => {
-      if(i%2===0){doc.setFillColor(247,248,252);doc.rect(mg,y-1,W-mg*2,7,'F');}
-      doc.setTextColor(20,37,67);doc.setFont('helvetica','normal');doc.setFontSize(9);
+      if(i%2===0){ setF(OFF); doc.rect(mg,y-1,W-mg*2,7,'F'); }
+      setT(NAVY); doc.setFont('helvetica','normal'); doc.setFontSize(9);
       doc.text(row.label,mg+3,y+4);
       doc.text('$'+row.val.toFixed(2),W-mg-3,y+4,{align:'right'});
       y+=7;
     });
   }
 
-  // Total section
-  y = Math.min(y, snap.incIVU ? 211 : 236); // safety: keep totals on one page
+  // ===== Totals — navy block, lime total =====
+  y = Math.min(y, snap.incIVU ? 208 : 232);
   y += 8;
-  doc.setDrawColor(226,231,240); doc.line(mg, y, W-mg, y);
-  y += 7;
-
+  const boxW = 92, bx = W - mg - boxW;
   if (snap.incIVU) {
-    // Big number = subtotal before tax
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,135,160);
-    doc.text('SUBTOTAL', mg, y+5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(20,37,67);
-    doc.text('$'+t.total.toFixed(2), W-mg, y+6, {align:'right'});
-    y += 12;
-    // Smaller IVU line
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(100,115,140);
-    doc.text('IVU 11.5%', W-mg-55, y+4);
-    doc.text('+ $'+(t.ivu||0).toFixed(2), W-mg-3, y+4, {align:'right'});
-    y += 9;
-    // Grand total with IVU
-    doc.setDrawColor(200,210,228); doc.line(W-mg-80, y, W-mg, y);
-    y += 5;
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(120,135,160);
-    doc.text('TOTAL CON IVU', mg, y+5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,37,67);
-    doc.text('$'+(t.grandTotal||t.total).toFixed(2), W-mg, y+6, {align:'right'});
+    const boxH = 36;
+    setF(NAVY); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setT([170,185,210]);
+    doc.text('Subtotal', bx+6, y+8); doc.text('IVU 11.5%', bx+6, y+15);
+    setT([255,255,255]);
+    doc.text('$'+t.total.toFixed(2), bx+boxW-6, y+8, {align:'right'});
+    doc.text('+ $'+(t.ivu||0).toFixed(2), bx+boxW-6, y+15, {align:'right'});
+    setF([60,80,120]); doc.rect(bx+6, y+19.5, boxW-12, 0.4, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(CYAN); doc.text('TOTAL CON IVU', bx+6, y+29);
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); setT(LIME);
+    doc.text('$'+(t.grandTotal||t.total).toFixed(2), bx+boxW-6, y+30, {align:'right'});
   } else {
-    // No IVU — just one big total
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,135,160);
-    doc.text('TOTAL ESTIMATE', mg, y+5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(20,37,67);
-    doc.text('$'+t.total.toFixed(2), W-mg, y+6, {align:'right'});
+    const boxH = 22;
+    setF(NAVY); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(CYAN); doc.text('TOTAL', bx+6, y+9);
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); setT(LIME);
+    doc.text('$'+t.total.toFixed(2), bx+boxW-6, y+16, {align:'right'});
   }
 
-  // Footer
-  const fy = 263;
-  doc.setDrawColor(226,231,240); doc.line(mg,fy,W-mg,fy);
-  doc.setFillColor(255,255,255); doc.rect(0,fy,W,34,'F');
-  doc.setTextColor(100,115,140); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  // ===== Footer =====
+  const fy = footerY;
+  setF(LIME); doc.rect(mg, fy, W-mg*2, 0.8, 'F');
+  doc.setTextColor(120,135,160); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
   const footerTxt = s.pdf_footer || 'Pago: 100% al completar el trabajo. Precios pueden variar según condiciones del proyecto. Cotización válida por 30 días.';
-  const footerLines = doc.splitTextToSize(footerTxt, W-mg*2);
-  doc.text(footerLines.slice(0,2), mg, fy+9);
-  // Footer contact line — always hardcoded correct values
-  const footerPhone = '(787) 419-0300';
-  const footerEmail = 'info@domoyourhome.com';
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(20,37,67);
-  doc.text('domo', mg, fy+22);
-  doc.setFont('helvetica','normal'); doc.setTextColor(120,135,160);
-  doc.text(`${footerPhone}  ·  ${footerEmail}`, mg+12, fy+22);
+  doc.text(doc.splitTextToSize(footerTxt, W-mg*2).slice(0,2), mg, fy+8);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(NAVY); doc.text('domo', mg, fy+21);
+  doc.setFont('helvetica','normal'); setT(MID);
+  doc.text('(787) 419-0300  ·  info@domoyourhome.com  ·  domoyourhome.com', mg+13, fy+21);
 
   doc.save(`${qNum} - ${snap.clientName}.pdf`);
 }
