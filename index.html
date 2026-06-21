@@ -4,10 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Domo · Quote Tool</title>
-<!-- Domo brand font: Epilogue (per brand assets). Biko is the display font but isn't on Google Fonts; Epilogue covers headings + body. -->
+<!-- Domo brand fonts: Epilogue (brand web/body font). Headings use Quicksand as a
+     license-safe stand-in for Biko (Biko is a restricted commercial font, print/logo only). -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -26,6 +27,7 @@
   --sidebar-w: 230px;
   --green: #2d6a4f;
   --green-light: #52b788;
+  --display: 'Quicksand', 'Epilogue', sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color: var(--dark); min-height: 100vh; display: flex; }
@@ -308,6 +310,11 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
   .q-meta .btn-sm, .q-meta .q-expand-btn { font-size: 12px; }
   .q-resp { flex-wrap: wrap; }
 }
+
+/* Headings/display use the rounded-geometric brand voice (Biko-like, license-safe).
+   Placed last so it wins over the per-element font-family on these selectors. */
+.page-title, .totals-title, .section-title, .stat-num, .login-title, .logo-sub,
+.queue-title, .totals-row.total, .q-price, .q-client, .lm-pill, .modal-title { font-family: var(--display); }
 </style>
 </head>
 <body>
