@@ -952,12 +952,15 @@ async function loadAndRenderQuotes() {
 }
 
 function renderStats() {
-  document.getElementById('stat-total').textContent = quotesCache.length;
-  const rev = quotesCache.filter(q => q.status === 'approved').reduce((s,q) => s + (q.grand_total || 0), 0);
+  // Shadow quotes are bot-drafted starting flags (the "Por cotizar" queue),
+  // not real quotes — exclude them from the top summary counts.
+  const real = quotesCache.filter(q => q.status !== 'shadow');
+  document.getElementById('stat-total').textContent = real.length;
+  const rev = real.filter(q => q.status === 'approved').reduce((s,q) => s + (q.grand_total || 0), 0);
   document.getElementById('stat-revenue').textContent = '$' + (rev >= 1000 ? (rev/1000).toFixed(1)+'k' : rev.toFixed(0));
-  document.getElementById('stat-approved').textContent = quotesCache.filter(q => q.status === 'approved').length;
-  document.getElementById('stat-pending').textContent = quotesCache.filter(q => q.status === 'sent').length;
-  document.getElementById('quotes-count').textContent = `${quotesCache.length} cotizaciones en total`;
+  document.getElementById('stat-approved').textContent = real.filter(q => q.status === 'approved').length;
+  document.getElementById('stat-pending').textContent = real.filter(q => q.status === 'sent').length;
+  document.getElementById('quotes-count').textContent = `${real.length} cotizaciones en total`;
 }
 
 // Price-meter gauge — reads quotes.price_band written by the lead-owner agent.
@@ -1027,7 +1030,9 @@ function lifecycleSelectHtml(quote) {
 function primaryActionHtml(quote) {
   const id = quote.id;
   if (quote.status === 'shadow')
-    return `<button class="btn btn-amber btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${id}')">Cotizar →</button>`;
+    // Use the bot draft as a STARTING TEMPLATE — creates a separate real quote,
+    // never edits/consolidates the shadow row.
+    return `<button class="btn btn-amber btn-sm" onclick="event.stopPropagation();startFromShadow('${id}')">Cotizar →</button>`;
   if (quote.status === 'draft')
     return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();markSent('${id}')">Enviar →</button>`;
   if (quote.status === 'sent')
@@ -1043,10 +1048,15 @@ function quoteDetailHtml(quote) {
       <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();updateQuoteStatus('${quote.id}','rejected')">✗ Rechazada</button>
     </div>`;
   }
+  // Shadows are never opened with the in-place editor (would consolidate them
+  // into a real quote). "Editar" on a shadow starts a new quote from it instead.
+  const editBtn = quote.status === 'shadow'
+    ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();startFromShadow('${quote.id}')">✎ Cotizar desde este</button>`
+    : `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Editar</button>`;
   return `${resp}<div class="q-detail-controls">
       ${statusSelectHtml(quote)}
       ${lifecycleSelectHtml(quote)}
-      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Editar</button>
+      ${editBtn}
       <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteQuote('${quote.id}')">Eliminar</button>
     </div>`;
 }
@@ -1057,9 +1067,11 @@ function quoteCard(quote) {
   const cd = quote.status === 'shadow' ? formatCountdown(quote.created_at) : null;
   if (cd && cd.urgent) el.classList.add('urgent');
   const gauge = priceBandPill(quote.price_band);
+  // Shadows open as a template (new quote); real quotes open in the editor.
+  const openFn = quote.status === 'shadow' ? 'startFromShadow' : 'loadQuoteForEditing';
   el.innerHTML = `
     <div class="q-main">
-      <div class="q-info" style="cursor:pointer;" onclick="loadQuoteForEditing('${quote.id}')">
+      <div class="q-info" style="cursor:pointer;" onclick="${openFn}('${quote.id}')">
         <div class="q-client">${esc(quote.client_name||'—')} <span class="q-num">${esc(quote.quote_number||'')}</span></div>
         <div class="q-scope">${esc(quote.scope || 'Sin scope')}</div>
       </div>
@@ -1223,6 +1235,47 @@ async function loadQuoteForEditing(id) {
   showPage('new-quote');
   scheduleLiveMeter();
   toast(`Editando ${quote.quote_number}`, 'success');
+}
+
+// Start a brand-new quote pre-filled from a bot 'shadow' draft, WITHOUT touching
+// the shadow row. editingQuoteId stays null so saving INSERTs a separate real
+// quote — the shadow (and its lead linkage) is preserved, never consolidated.
+async function startFromShadow(id) {
+  const shadow = quotesCache.find(q => q.id === id);
+  if (!shadow) return;
+
+  const { data: lines } = await sb.from('quote_line_items')
+    .select('*').eq('quote_id', id).order('sort_order');
+
+  editingQuoteId = null; // <-- not editing the shadow; this becomes a new quote
+  currentLineItems = (lines || []).map(l => ({
+    id: uid(), description: l.description, category: l.category,
+    quantity: l.quantity, unit: l.unit, unit_cost: l.unit_cost,
+  }));
+
+  document.getElementById('q-client-name').value = shadow.client_name || '';
+  document.getElementById('q-client-phone').value = shadow.client_phone || '';
+  document.getElementById('q-client-email').value = shadow.client_email || '';
+  document.getElementById('q-property').value = shadow.client_property || '';
+  document.getElementById('q-notes').value = shadow.internal_notes || '';
+  document.getElementById('q-scope').value = shadow.scope || '';
+  document.getElementById('total-override').value = '';
+  document.getElementById('inc-materials').checked = shadow.includes_materials !== false;
+  document.getElementById('inc-equipment').checked = shadow.includes_equipment !== false;
+  document.getElementById('margin-labor').value = shadow.margin_labor || 40;
+  document.getElementById('margin-materials').value = shadow.margin_materials || 25;
+  document.getElementById('margin-equipment').value = shadow.margin_equipment || 25;
+  const d = new Date(); d.setDate(d.getDate() + 30);
+  document.getElementById('q-valid-until').value = d.toISOString().split('T')[0];
+
+  document.getElementById('quote-page-title').textContent = 'Nueva cotización (desde borrador IA)';
+  document.getElementById('quote-number-display').textContent = 'QT-' + String(quoteCounter).padStart(4, '0');
+  document.getElementById('save-draft-btn').textContent = 'Guardar borrador';
+
+  renderLineItems();
+  showPage('new-quote');
+  scheduleLiveMeter();
+  toast('Cotización nueva desde el borrador IA — el borrador queda intacto.', 'success');
 }
 
 // ============================================================
