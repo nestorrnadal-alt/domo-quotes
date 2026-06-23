@@ -1861,7 +1861,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   const s = settingsCache;
   // Brand palette
   const NAVY=[20,37,67], BLUE=[54,82,165], LIME=[214,226,100], CYAN=[139,215,215],
-        MID=[122,138,170], INK=[40,55,80], OFF=[247,248,252], CREAM=[238,241,248];
+        MID=[122,138,170], INK=[55,61,70], OFF=[247,248,252], CREAM=[238,241,248];
   const setT=(c)=>doc.setTextColor(c[0],c[1],c[2]);
   const setF=(c)=>doc.setFillColor(c[0],c[1],c[2]);
 
@@ -1871,7 +1871,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
     const targetH = 17, targetW = targetH*(lw/lh);
     doc.addImage(dataURL,'PNG',mg,13,targetW,targetH);
   } catch(e) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT(NAVY); doc.text('domo', mg, 28);
+    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT(BLUE); doc.text('domo', mg, 28);
   }
   doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(BLUE);
   doc.text('Tu lista del hogar, resuelta.', mg, 40);
@@ -1880,9 +1880,10 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   doc.setFont('helvetica','normal'); setT(MID);
   doc.text('info@domoyourhome.com', W-mg, 22, {align:'right'});
   doc.text('domoyourhome.com', W-mg, 28, {align:'right'});
-  // accent rule under header (teal over a thin light hairline)
+  // accent rule under header — teal stripe with a lime highlight tab at the left
   setF([226,231,240]); doc.rect(0,47.6,W,0.4,'F');
   setF(CYAN); doc.rect(0,46,W,1.6,'F');
+  setF(LIME); doc.rect(0,46,46,1.6,'F');
 
   let y = 58;
 
@@ -1899,7 +1900,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
 
   // ===== Prepared for =====
   doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text('PARA', mg, y); y += 6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(NAVY); doc.text(snap.clientName, mg, y); y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(BLUE); doc.text(snap.clientName, mg, y); y += 5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setT([80,95,120]);
   if (snap.clientProperty) { doc.text(snap.clientProperty, mg, y); y += 4.5; }
   if (snap.clientPhone) { doc.text(snap.clientPhone, mg, y); y += 4.5; }
@@ -2005,14 +2006,14 @@ async function buildQuotePdfDoc(snap, qNum, t) {
     doc.text('+ $'+(t.ivu||0).toFixed(2), bx+boxW-6, y+15, {align:'right'});
     setF([214,221,233]); doc.rect(bx+8, y+19.5, boxW-14, 0.4, 'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(BLUE); doc.text('TOTAL CON IVU', bx+8, y+29);
-    doc.setFont('helvetica','bold'); doc.setFontSize(16); setT(NAVY);
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); setT(BLUE);
     doc.text('$'+(t.grandTotal||t.total).toFixed(2), bx+boxW-6, y+30, {align:'right'});
   } else {
     const boxH = 22;
     setF(CREAM); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
     setF(CYAN); doc.rect(bx, y+2.5, 2.2, boxH-5, 'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(BLUE); doc.text('TOTAL', bx+8, y+9);
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); setT(NAVY);
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); setT(BLUE);
     doc.text('$'+t.total.toFixed(2), bx+boxW-6, y+16, {align:'right'});
   }
 
