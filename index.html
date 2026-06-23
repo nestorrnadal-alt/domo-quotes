@@ -35,7 +35,8 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 /* SIDEBAR */
 #sidebar {
   width: var(--sidebar-w);
-  background: var(--dark);
+  background: var(--card);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   padding: 28px 0;
@@ -43,24 +44,24 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
   top: 0; left: 0; bottom: 0;
   z-index: 100;
 }
-.logo { padding: 0 24px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.logo img { width: 100%; max-width: 150px; display: block; filter: brightness(0) invert(1); }
-.logo-sub { font-family: 'Epilogue', monospace; font-size: 10px; color: var(--teal); letter-spacing: 2px; text-transform: uppercase; margin-top: 8px; }
+.logo { padding: 0 24px 28px; border-bottom: 1px solid var(--border); }
+.logo img { width: 100%; max-width: 150px; display: block; }
+.logo-sub { font-family: 'Epilogue', monospace; font-size: 10px; color: var(--mid); letter-spacing: 2px; text-transform: uppercase; margin-top: 8px; }
 .nav { padding: 24px 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .nav-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 24px; color: rgba(255,255,255,0.5);
+  padding: 10px 24px; color: var(--mid);
   font-size: 13.5px; font-weight: 500; cursor: pointer;
   transition: all 0.15s; border-left: 3px solid transparent; user-select: none;
 }
-.nav-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.06); }
-.nav-item.active { color: var(--teal); border-left-color: var(--teal); background: rgba(139,215,215,0.08); }
+.nav-item:hover { color: var(--dark); background: var(--cream); }
+.nav-item.active { color: var(--primary); font-weight: 600; border-left-color: var(--teal); background: rgba(139,215,215,0.14); }
 .nav-icon { font-size: 16px; width: 20px; text-align: center; }
-.nav-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 8px 24px; }
-.sidebar-user { padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.08); }
-.sidebar-user-name { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; }
-.sidebar-user-logout { font-size: 11px; color: rgba(255,255,255,0.3); cursor: pointer; margin-top: 3px; }
-.sidebar-user-logout:hover { color: var(--teal); }
+.nav-divider { height: 1px; background: var(--border); margin: 8px 24px; }
+.sidebar-user { padding: 16px 24px; border-top: 1px solid var(--border); }
+.sidebar-user-name { font-size: 12px; color: var(--mid); font-weight: 500; }
+.sidebar-user-logout { font-size: 11px; color: var(--mid); opacity: 0.7; cursor: pointer; margin-top: 3px; }
+.sidebar-user-logout:hover { color: var(--primary); opacity: 1; }
 
 /* MAIN */
 #main { margin-left: var(--sidebar-w); flex: 1; padding: 36px 40px; max-width: calc(100vw - var(--sidebar-w)); }
@@ -270,7 +271,7 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
     width: 100%; height: auto; flex-direction: row; align-items: center;
     gap: 6px; padding: 8px 12px; overflow-x: auto;
   }
-  .logo { padding: 0 10px 0 0; margin-right: 2px; border-bottom: none; border-right: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+  .logo { padding: 0 10px 0 0; margin-right: 2px; border-bottom: none; border-right: 1px solid var(--border); flex-shrink: 0; }
   .logo img { max-width: 82px; }
   .logo-sub { display: none; }
   .nav { flex-direction: row; padding: 0; gap: 2px; flex: 1; overflow-x: auto; }
@@ -1035,7 +1036,7 @@ function primaryActionHtml(quote) {
     // never edits/consolidates the shadow row.
     return `<button class="btn btn-amber btn-sm" onclick="event.stopPropagation();startFromShadow('${id}')">Cotizar →</button>`;
   if (quote.status === 'draft')
-    return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();markSent('${id}')">Enviar →</button>`;
+    return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();markSent('${id}', this)">Enviar →</button>`;
   if (quote.status === 'sent')
     return `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();toggleQExpand(this)">Registrar respuesta</button>`;
   return `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${id}')">Abrir</button>`;
@@ -1096,18 +1097,44 @@ function toggleQExpand(btn) {
   if (card) card.classList.toggle('open');
 }
 
-async function markSent(id) {
-  const { error } = await sb.from('quotes').update({ status: 'sent' }).eq('id', id);
-  if (error) {
-    toast(/missing both client_phone and client_email/i.test(error.message||'')
-      ? 'Agrega teléfono o email antes de enviar.' : 'No se pudo enviar: ' + error.message, 'error');
-    return;
+async function markSent(id, btn) {
+  const quote = quotesCache.find(x => x.id === id);
+  if (!quote) return;
+
+  // Recipient: client email on the quote, else ask once (and save it).
+  let to = (quote.client_email || '').trim();
+  if (!to) {
+    to = (prompt(`Email del cliente para enviar ${quote.quote_number}:`) || '').trim();
+    if (!to) { toast('Necesitas un email para enviar la cotización.', 'error'); return; }
   }
-  const qq = quotesCache.find(x => x.id === id);
-  if (qq) qq.status = 'sent';
-  renderStats();
-  renderQuotesList();
-  toast('Marcada como enviada.', 'success');
+  if (!/^\S+@\S+\.\S+$/.test(to)) { toast('Email no válido.', 'error'); return; }
+  if (!confirm(`Enviar ${quote.quote_number} a ${to} con el PDF adjunto?`)) return;
+
+  const orig = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Enviando...'; }
+  try {
+    // Persist the email on the quote if it didn't have one (keeps the record consistent
+    // and lets the 'sent' status trigger pass).
+    if (!quote.client_email) {
+      await sb.from('quotes').update({ client_email: to }).eq('id', id);
+      quote.client_email = to;
+    }
+    // Rebuild the PDF from the saved quote + its line items.
+    const { data: lines } = await sb.from('quote_line_items').select('*').eq('quote_id', id).order('sort_order');
+    const snap = snapFromQuote(quote, lines || []);
+    const totals = totalsFromQuote(quote);
+    const b64 = await quotePdfBase64(snap, quote.quote_number, totals);
+    await sendQuoteEmail(id, to, b64, `${quote.quote_number} - ${quote.client_name}.pdf`);
+
+    quote.status = 'sent';
+    quote.sent_to_email = to;
+    renderStats();
+    renderQuotesList();
+    toast(`${quote.quote_number} enviada a ${to}.`, 'success');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    toast('No se pudo enviar: ' + e.message, 'error');
+  }
 }
 
 let countdownTimer = null;
@@ -1748,6 +1775,7 @@ async function generatePDF() {
   btn.innerHTML = '<span class="spinner"></span> Saving...';
 
   const status = document.getElementById('finish-status').value;
+  const wasEditingId = editingQuoteId; // captured before save (clearQuote nulls it)
   const snapshot = {
     lineItems: JSON.parse(JSON.stringify(currentLineItems)),
     clientName: document.getElementById('q-client-name').value.trim(),
@@ -1781,12 +1809,31 @@ async function generatePDF() {
     return;
   }
 
-  await buildAndDownloadPDF(snapshot, result.qNum, result.totals);
-  // If save was downgraded to draft, the draft toast already fired; skip the generic 'saved & PDF downloaded' to avoid contradicting it.
-  if (!result.downgradedToDraft) {
-    toast(`${result.qNum} saved & PDF downloaded!`, 'success');
+  // Build the PDF once: download it locally, and reuse the same doc to email it.
+  const doc = await buildQuotePdfDoc(snapshot, result.qNum, result.totals);
+  doc.save(`${result.qNum} - ${snapshot.clientName}.pdf`);
+
+  // When marked 'Sent to Client' (and the save wasn't downgraded for missing
+  // contact), email the client the quote with the PDF attached.
+  const wantSend = status === 'sent' && !result.downgradedToDraft;
+  const toEmail = (snapshot.clientEmail || '').trim();
+  const quoteId = result.quote ? result.quote.id : wasEditingId;
+  if (wantSend && toEmail && quoteId) {
+    btn.innerHTML = '<span class="spinner"></span> Enviando email...';
+    try {
+      const uri = doc.output('datauristring');
+      const b64 = uri.substring(uri.indexOf('base64,') + 7);
+      await sendQuoteEmail(quoteId, toEmail, b64, `${result.qNum} - ${snapshot.clientName}.pdf`);
+      toast(`${result.qNum} enviada a ${toEmail} (PDF adjunto).`, 'success');
+    } catch (e) {
+      toast(`Guardada y PDF descargado, pero el email falló: ${e.message}`, 'error');
+    }
+  } else if (wantSend && !toEmail) {
+    toast('Guardada como enviada. Agrega un email del cliente para enviar la cotización.', 'success');
+  } else if (!result.downgradedToDraft) {
+    toast(`${result.qNum} guardada y PDF descargado.`, 'success');
   } else {
-    toast('PDF downloaded.', 'success');
+    toast('PDF descargado.', 'success');
   }
 
   btn.disabled = false;
@@ -1795,34 +1842,49 @@ async function generatePDF() {
 }
 
 async function buildAndDownloadPDF(snap, qNum, t) {
+  const doc = await buildQuotePdfDoc(snap, qNum, t);
+  doc.save(`${qNum} - ${snap.clientName}.pdf`);
+}
+
+// Build the quote PDF and return the jsPDF doc (no download). Lets callers either
+// save it locally or extract base64 to email it.
+async function quotePdfBase64(snap, qNum, t) {
+  const doc = await buildQuotePdfDoc(snap, qNum, t);
+  const uri = doc.output('datauristring'); // data:application/pdf;...;base64,XXXX
+  return uri.substring(uri.indexOf('base64,') + 7);
+}
+
+async function buildQuotePdfDoc(snap, qNum, t) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, mg = 18;
   const s = settingsCache;
   // Brand palette
-  const NAVY=[20,37,67], BLUE=[54,82,165], LIME=[214,226,100], CYAN=[139,215,215],
-        MID=[122,138,170], INK=[40,55,80], OFF=[247,248,252];
+  const PERI=[128,162,249], LIME=[214,226,100], CYAN=[139,215,215],
+        MID=[122,138,170], INK=[55,61,70], OFF=[247,248,252], CREAM=[238,241,248];
+  const BLUE=PERI; // emphasis colour (no navy / no dark primary)
   const setT=(c)=>doc.setTextColor(c[0],c[1],c[2]);
   const setF=(c)=>doc.setFillColor(c[0],c[1],c[2]);
 
-  // ===== Header band (navy) =====
-  setF(NAVY); doc.rect(0,0,W,46,'F');
+  // ===== Header (white — logo image + teal/lime accent rule) =====
   try {
-    const { dataURL, w:lw, h:lh } = await loadImageAsDataURL('https://dp3d2hb4975es.cloudfront.net/uploads/domo/2026/6/1/1780335566logosmall1.png');
-    const targetH = 20, targetW = targetH*(lw/lh);
-    doc.addImage(dataURL,'PNG',mg,12,targetW,targetH);
+    const { dataURL, w:lw, h:lh } = await loadImageAsDataURL('https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png');
+    const targetH = 17, targetW = targetH*(lw/lh);
+    doc.addImage(dataURL,'PNG',mg,13,targetW,targetH);
   } catch(e) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT([255,255,255]); doc.text('domo', mg, 28);
+    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT(PERI); doc.text('domo', mg, 28);
   }
-  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(LIME);
+  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(BLUE);
   doc.text('Tu lista del hogar, resuelta.', mg, 40);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); setT(CYAN);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(BLUE);
   doc.text('(787) 419-0300', W-mg, 16, {align:'right'});
-  setT([255,255,255]);
+  doc.setFont('helvetica','normal'); setT(MID);
   doc.text('info@domoyourhome.com', W-mg, 22, {align:'right'});
   doc.text('domoyourhome.com', W-mg, 28, {align:'right'});
-  // lime accent under header
-  setF(LIME); doc.rect(0,46,W,1.6,'F');
+  // accent rule under header — teal stripe with a lime highlight tab at the left
+  setF([226,231,240]); doc.rect(0,47.6,W,0.4,'F');
+  setF(CYAN); doc.rect(0,46,W,1.6,'F');
+  setF(LIME); doc.rect(0,46,46,1.6,'F');
 
   let y = 58;
 
@@ -1832,14 +1894,14 @@ async function buildAndDownloadPDF(snap, qNum, t) {
   meta.forEach(([label,val],i) => {
     const x = mg + i*60;
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text(label, x, y);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); setT(NAVY); doc.text(String(val), x, y+6);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); setT(BLUE); doc.text(String(val), x, y+6);
   });
   y += 12;
   doc.setDrawColor(226,231,240); doc.line(mg, y, W-mg, y); y += 9;
 
   // ===== Prepared for =====
   doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text('PARA', mg, y); y += 6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(NAVY); doc.text(snap.clientName, mg, y); y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(BLUE); doc.text(snap.clientName, mg, y); y += 5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setT([80,95,120]);
   if (snap.clientProperty) { doc.text(snap.clientProperty, mg, y); y += 4.5; }
   if (snap.clientPhone) { doc.text(snap.clientPhone, mg, y); y += 4.5; }
@@ -1878,8 +1940,8 @@ async function buildAndDownloadPDF(snap, qNum, t) {
 
   // ===== Items / breakdown =====
   if (pdfStyle !== 'lumpsum') {
-    setF(NAVY); doc.roundedRect(mg, y, W-mg*2, 7.5, 1.2, 1.2, 'F');
-    setT([255,255,255]); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    setF(CREAM); doc.roundedRect(mg, y, W-mg*2, 7.5, 1.2, 1.2, 'F');
+    setT(BLUE); doc.setFont('helvetica','bold'); doc.setFontSize(8);
     if (pdfStyle === 'itemized') {
       doc.text('DESCRIPCIÓN', mg+3, y+5);
       doc.text('CANT', mg+100, y+5);
@@ -1890,12 +1952,13 @@ async function buildAndDownloadPDF(snap, qNum, t) {
       doc.text('CONCEPTO', mg+3, y+5);
       doc.text('MONTO', W-mg-3, y+5, {align:'right'});
     }
+    setF(CYAN); doc.rect(mg, y+7.0, W-mg*2, 0.7, 'F');
     y += 7.5;
   }
 
   if (pdfStyle === 'lumpsum') {
     y += 10;
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); setT(NAVY);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); setT(INK);
     doc.text('Servicios profesionales según el trabajo descrito.', mg+1, y); y += 6;
     doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(MID);
     const incl = ['mano de obra'];
@@ -1906,7 +1969,7 @@ async function buildAndDownloadPDF(snap, qNum, t) {
     const visible = snap.lineItems.filter(i => !(i.category==='materials'&&!snap.incMat) && !(i.category==='equipment'&&!snap.incEq));
     visible.forEach((item,i) => {
       if (i%2===0) { setF(OFF); doc.rect(mg,y-1,W-mg*2,6.5,'F'); }
-      setT(NAVY); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+      setT(INK); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
       doc.text(doc.splitTextToSize(item.description,80)[0], mg+3, y+3.5);
       doc.text(String(item.quantity), mg+100, y+3.5);
       doc.text(item.unit||'', mg+112, y+3.5);
@@ -1922,7 +1985,7 @@ async function buildAndDownloadPDF(snap, qNum, t) {
     ];
     rows.forEach((row,i) => {
       if(i%2===0){ setF(OFF); doc.rect(mg,y-1,W-mg*2,7,'F'); }
-      setT(NAVY); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      setT(INK); doc.setFont('helvetica','normal'); doc.setFontSize(9);
       doc.text(row.label,mg+3,y+4);
       doc.text('$'+row.val.toFixed(2),W-mg-3,y+4,{align:'right'});
       y+=7;
@@ -1935,35 +1998,82 @@ async function buildAndDownloadPDF(snap, qNum, t) {
   const boxW = 92, bx = W - mg - boxW;
   if (snap.incIVU) {
     const boxH = 36;
-    setF(NAVY); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setT([170,185,210]);
-    doc.text('Subtotal', bx+6, y+8); doc.text('IVU 11.5%', bx+6, y+15);
-    setT([255,255,255]);
+    setF(CREAM); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
+    setF(CYAN); doc.rect(bx, y+2.5, 2.2, boxH-5, 'F');
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); setT(MID);
+    doc.text('Subtotal', bx+8, y+8); doc.text('IVU 11.5%', bx+8, y+15);
+    setT(INK);
     doc.text('$'+t.total.toFixed(2), bx+boxW-6, y+8, {align:'right'});
     doc.text('+ $'+(t.ivu||0).toFixed(2), bx+boxW-6, y+15, {align:'right'});
-    setF([60,80,120]); doc.rect(bx+6, y+19.5, boxW-12, 0.4, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(CYAN); doc.text('TOTAL CON IVU', bx+6, y+29);
-    doc.setFont('helvetica','bold'); doc.setFontSize(16); setT(LIME);
+    setF([214,221,233]); doc.rect(bx+8, y+19.5, boxW-14, 0.4, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(BLUE); doc.text('TOTAL CON IVU', bx+8, y+29);
+    doc.setFont('helvetica','bold'); doc.setFontSize(16); setT(BLUE);
     doc.text('$'+(t.grandTotal||t.total).toFixed(2), bx+boxW-6, y+30, {align:'right'});
   } else {
     const boxH = 22;
-    setF(NAVY); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(CYAN); doc.text('TOTAL', bx+6, y+9);
-    doc.setFont('helvetica','bold'); doc.setFontSize(18); setT(LIME);
+    setF(CREAM); doc.roundedRect(bx, y, boxW, boxH, 2.5, 2.5, 'F');
+    setF(CYAN); doc.rect(bx, y+2.5, 2.2, boxH-5, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); setT(BLUE); doc.text('TOTAL', bx+8, y+9);
+    doc.setFont('helvetica','bold'); doc.setFontSize(18); setT(BLUE);
     doc.text('$'+t.total.toFixed(2), bx+boxW-6, y+16, {align:'right'});
   }
 
   // ===== Footer =====
   const fy = footerY;
-  setF(LIME); doc.rect(mg, fy, W-mg*2, 0.8, 'F');
+  setF(CYAN); doc.rect(mg, fy, W-mg*2, 0.8, 'F');
   doc.setTextColor(120,135,160); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
   const footerTxt = s.pdf_footer || 'Pago: 100% al completar el trabajo. Precios pueden variar según condiciones del proyecto. Cotización válida por 30 días.';
   doc.text(doc.splitTextToSize(footerTxt, W-mg*2).slice(0,2), mg, fy+8);
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(NAVY); doc.text('domo', mg, fy+21);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(BLUE); doc.text('domo', mg, fy+21);
   doc.setFont('helvetica','normal'); setT(MID);
   doc.text('(787) 419-0300  ·  info@domoyourhome.com  ·  domoyourhome.com', mg+13, fy+21);
 
-  doc.save(`${qNum} - ${snap.clientName}.pdf`);
+  return doc;
+}
+
+// ============================================================
+// SEND QUOTE EMAIL (PDF attachment via send-quote-email edge fn)
+// ============================================================
+// Reconstruct the PDF snapshot + totals for an already-saved quote (queue send).
+function snapFromQuote(q, lines) {
+  return {
+    lineItems: (lines || []).map(l => ({
+      description: l.description, category: l.category,
+      quantity: Number(l.quantity), unit: l.unit, unit_cost: Number(l.unit_cost),
+    })),
+    clientName: q.client_name || '',
+    clientPhone: q.client_phone || '',
+    clientEmail: q.client_email || '',
+    clientProperty: q.client_property || '',
+    scope: q.scope || '',
+    validUntil: q.valid_until || '',
+    incMat: q.includes_materials !== false,
+    incEq: q.includes_equipment !== false,
+    incIVU: (Number(q.grand_total) || 0) - (Number(q.total_labor) || 0) - (Number(q.total_materials) || 0) - (Number(q.total_equipment) || 0) > 0.005,
+  };
+}
+function totalsFromQuote(q) {
+  const bL = Number(q.total_labor) || 0, bM = Number(q.total_materials) || 0, bE = Number(q.total_equipment) || 0;
+  const subtotal = bL + bM + bE;
+  const grand = Number(q.grand_total) || subtotal;
+  const ivu = Math.max(0, grand - subtotal);
+  return { labor: bL, materials: bM, equipment: bE, total: subtotal, ivu, grandTotal: grand };
+}
+
+// Invoke the edge function; it forwards to the Make webhook (→ Gmail), logs to
+// quote_emails, and flips the quote to 'sent'. Throws with a readable message.
+async function sendQuoteEmail(quoteId, toEmail, pdfBase64, pdfFilename) {
+  const { data, error } = await sb.functions.invoke('send-quote-email', {
+    body: { quote_id: quoteId, to: toEmail, pdf_base64: pdfBase64, pdf_filename: pdfFilename },
+  });
+  if (error) {
+    // Edge errors come back as FunctionsHttpError; try to surface the JSON body.
+    let msg = error.message || 'Error al enviar';
+    try { const ctx = await error.context?.json(); if (ctx?.error) msg = ctx.error; } catch (_) {}
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
 }
 
 // ============================================================
