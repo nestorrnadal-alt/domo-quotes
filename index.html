@@ -1860,19 +1860,14 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   const W = 210, mg = 18;
   const s = settingsCache;
   // Brand palette
-  const NAVY=[20,37,67], BLUE=[54,82,165], LIME=[214,226,100], CYAN=[139,215,215],
+  const PERI=[128,162,249], LIME=[214,226,100], CYAN=[139,215,215],
         MID=[122,138,170], INK=[55,61,70], OFF=[247,248,252], CREAM=[238,241,248];
+  const BLUE=PERI; // emphasis colour (no navy / no dark primary)
   const setT=(c)=>doc.setTextColor(c[0],c[1],c[2]);
   const setF=(c)=>doc.setFillColor(c[0],c[1],c[2]);
 
-  // ===== Header (white — navy logo + lime accent rule) =====
-  try {
-    const { dataURL, w:lw, h:lh } = await loadImageAsDataURL('https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png');
-    const targetH = 17, targetW = targetH*(lw/lh);
-    doc.addImage(dataURL,'PNG',mg,13,targetW,targetH);
-  } catch(e) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT(BLUE); doc.text('domo', mg, 28);
-  }
+  // ===== Header (white — periwinkle wordmark + teal/lime accent rule) =====
+  doc.setFont('helvetica','bold'); doc.setFontSize(26); setT(PERI); doc.text('domo', mg, 28);
   doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(BLUE);
   doc.text('Tu lista del hogar, resuelta.', mg, 40);
   doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(BLUE);
