@@ -1880,8 +1880,8 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   doc.setFont('helvetica','normal'); setT(MID);
   doc.text('info@domoyourhome.com', W-mg, 22, {align:'right'});
   doc.text('domoyourhome.com', W-mg, 28, {align:'right'});
-  // accent rule under header (lime over a thin navy hairline)
-  setF(NAVY); doc.rect(0,47.6,W,0.4,'F');
+  // accent rule under header (teal over a thin light hairline)
+  setF([226,231,240]); doc.rect(0,47.6,W,0.4,'F');
   setF(CYAN); doc.rect(0,46,W,1.6,'F');
 
   let y = 58;
@@ -1892,7 +1892,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   meta.forEach(([label,val],i) => {
     const x = mg + i*60;
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text(label, x, y);
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); setT(NAVY); doc.text(String(val), x, y+6);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); setT(BLUE); doc.text(String(val), x, y+6);
   });
   y += 12;
   doc.setDrawColor(226,231,240); doc.line(mg, y, W-mg, y); y += 9;
@@ -1939,7 +1939,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   // ===== Items / breakdown =====
   if (pdfStyle !== 'lumpsum') {
     setF(CREAM); doc.roundedRect(mg, y, W-mg*2, 7.5, 1.2, 1.2, 'F');
-    setT(NAVY); doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    setT(BLUE); doc.setFont('helvetica','bold'); doc.setFontSize(8);
     if (pdfStyle === 'itemized') {
       doc.text('DESCRIPCIÓN', mg+3, y+5);
       doc.text('CANT', mg+100, y+5);
@@ -1956,7 +1956,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
 
   if (pdfStyle === 'lumpsum') {
     y += 10;
-    doc.setFont('helvetica','normal'); doc.setFontSize(10); setT(NAVY);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); setT(INK);
     doc.text('Servicios profesionales según el trabajo descrito.', mg+1, y); y += 6;
     doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(MID);
     const incl = ['mano de obra'];
@@ -1967,7 +1967,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
     const visible = snap.lineItems.filter(i => !(i.category==='materials'&&!snap.incMat) && !(i.category==='equipment'&&!snap.incEq));
     visible.forEach((item,i) => {
       if (i%2===0) { setF(OFF); doc.rect(mg,y-1,W-mg*2,6.5,'F'); }
-      setT(NAVY); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+      setT(INK); doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
       doc.text(doc.splitTextToSize(item.description,80)[0], mg+3, y+3.5);
       doc.text(String(item.quantity), mg+100, y+3.5);
       doc.text(item.unit||'', mg+112, y+3.5);
@@ -1983,7 +1983,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
     ];
     rows.forEach((row,i) => {
       if(i%2===0){ setF(OFF); doc.rect(mg,y-1,W-mg*2,7,'F'); }
-      setT(NAVY); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      setT(INK); doc.setFont('helvetica','normal'); doc.setFontSize(9);
       doc.text(row.label,mg+3,y+4);
       doc.text('$'+row.val.toFixed(2),W-mg-3,y+4,{align:'right'});
       y+=7;
@@ -2022,7 +2022,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   doc.setTextColor(120,135,160); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
   const footerTxt = s.pdf_footer || 'Pago: 100% al completar el trabajo. Precios pueden variar según condiciones del proyecto. Cotización válida por 30 días.';
   doc.text(doc.splitTextToSize(footerTxt, W-mg*2).slice(0,2), mg, fy+8);
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(NAVY); doc.text('domo', mg, fy+21);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(BLUE); doc.text('domo', mg, fy+21);
   doc.setFont('helvetica','normal'); setT(MID);
   doc.text('(787) 419-0300  ·  info@domoyourhome.com  ·  domoyourhome.com', mg+13, fy+21);
 
