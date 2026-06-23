@@ -38,7 +38,7 @@ Always include at least one labor item.
 Be specific and practical. If scope is vague, estimate conservatively.`;
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+            model: "claude-sonnet-4-6",
       max_tokens: 1024,
       messages: [{ role: "user", content: prompt }],
     });
