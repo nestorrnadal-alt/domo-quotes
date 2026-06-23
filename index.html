@@ -1860,33 +1860,35 @@ async function buildQuotePdfDoc(snap, qNum, t) {
   const W = 210, mg = 18;
   const s = settingsCache;
   // Brand palette
-  const PERI=[128,162,249], LIME=[214,226,100], CYAN=[139,215,215],
+  const PERI=[128,162,249], LIME=[214,226,100], CYAN=[139,215,215], NAVY=[20,37,67],
         MID=[122,138,170], INK=[55,61,70], OFF=[247,248,252], CREAM=[238,241,248];
-  const BLUE=PERI; // emphasis colour (no navy / no dark primary)
+  const BLUE=PERI; // periwinkle emphasis colour
   const setT=(c)=>doc.setTextColor(c[0],c[1],c[2]);
   const setF=(c)=>doc.setFillColor(c[0],c[1],c[2]);
 
-  // ===== Header (white — logo image + teal/lime accent rule) =====
+  // ===== Header (white — large logo image + teal/lime accent rule) =====
   try {
     const { dataURL, w:lw, h:lh } = await loadImageAsDataURL('https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png');
-    const targetH = 17, targetW = targetH*(lw/lh);
-    doc.addImage(dataURL,'PNG',mg,13,targetW,targetH);
+    let targetH = 34, targetW = targetH*(lw/lh);   // 2x the previous 17mm
+    const maxW = 100;                              // keep clear of the contact block
+    if (targetW > maxW) { targetW = maxW; targetH = targetW*(lh/lw); }
+    doc.addImage(dataURL,'PNG',mg,12,targetW,targetH);
   } catch(e) {
-    doc.setFont('helvetica','bold'); doc.setFontSize(26); setT(PERI); doc.text('domo', mg, 28);
+    doc.setFont('helvetica','bold'); doc.setFontSize(40); setT(PERI); doc.text('domo', mg, 36);
   }
-  doc.setFont('helvetica','italic'); doc.setFontSize(8.5); setT(BLUE);
-  doc.text('Tu lista del hogar, resuelta.', mg, 40);
+  doc.setFont('helvetica','italic'); doc.setFontSize(9); setT(NAVY);
+  doc.text('Tu lista del hogar, resuelta.', mg, 53);
   doc.setFont('helvetica','bold'); doc.setFontSize(8); setT(BLUE);
-  doc.text('(787) 419-0300', W-mg, 16, {align:'right'});
+  doc.text('(787) 419-0300', W-mg, 22, {align:'right'});
   doc.setFont('helvetica','normal'); setT(MID);
-  doc.text('info@domoyourhome.com', W-mg, 22, {align:'right'});
-  doc.text('domoyourhome.com', W-mg, 28, {align:'right'});
+  doc.text('info@domoyourhome.com', W-mg, 28, {align:'right'});
+  doc.text('domoyourhome.com', W-mg, 34, {align:'right'});
   // accent rule under header — teal stripe with a lime highlight tab at the left
-  setF([226,231,240]); doc.rect(0,47.6,W,0.4,'F');
-  setF(CYAN); doc.rect(0,46,W,1.6,'F');
-  setF(LIME); doc.rect(0,46,46,1.6,'F');
+  setF([226,231,240]); doc.rect(0,59.6,W,0.4,'F');
+  setF(CYAN); doc.rect(0,58,W,1.6,'F');
+  setF(LIME); doc.rect(0,58,46,1.6,'F');
 
-  let y = 58;
+  let y = 70;
 
   // ===== Quote meta row =====
   const dateStr = new Date().toLocaleDateString('es-ES',{year:'numeric',month:'short',day:'numeric'});
@@ -1901,7 +1903,7 @@ async function buildQuotePdfDoc(snap, qNum, t) {
 
   // ===== Prepared for =====
   doc.setFont('helvetica','bold'); doc.setFontSize(7.5); setT(MID); doc.text('PARA', mg, y); y += 6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(BLUE); doc.text(snap.clientName, mg, y); y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); setT(NAVY); doc.text(snap.clientName, mg, y); y += 5;
   doc.setFont('helvetica','normal'); doc.setFontSize(9); setT([80,95,120]);
   if (snap.clientProperty) { doc.text(snap.clientProperty, mg, y); y += 4.5; }
   if (snap.clientPhone) { doc.text(snap.clientPhone, mg, y); y += 4.5; }
