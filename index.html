@@ -187,6 +187,25 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 /* SCOPE AREA */
 .scope-area { background: #f0f4ff; border: 2px dashed var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; transition: border-color 0.15s; }
 .scope-area:focus-within { border-color: var(--primary); }
+/* Reference photos */
+.photos-block { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+.photos-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.section-subtitle { font-weight: 700; font-size: 13.5px; color: var(--dark); }
+.photos-count { color: var(--mid); font-weight: 600; }
+.photos-hint { font-size: 11.5px; color: var(--mid); }
+.photos-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.q-photo { position: relative; width: 92px; height: 92px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: #f4f6fb; }
+.q-photo img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; display: block; }
+.q-photo.uploading img { opacity: 0.45; }
+.q-photo-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.q-photo-del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(20,37,67,0.72); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.q-photo-del:hover { background: var(--red); }
+.photos-add { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 14px; border: 1.5px dashed var(--border); border-radius: 8px; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; background: #fff; }
+.photos-add:hover { border-color: var(--primary); background: #f5f8ff; }
+.q-photo-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--mid); }
+.photo-lightbox { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(10,16,30,0.86); align-items: center; justify-content: center; padding: 24px; }
+.photo-lightbox img { max-width: 94vw; max-height: 90vh; border-radius: 10px; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
+.photo-lightbox-close { position: fixed; top: 18px; right: 22px; width: 40px; height: 40px; border: none; border-radius: 50%; background: rgba(255,255,255,0.15); color: #fff; font-size: 18px; cursor: pointer; }
 
 /* AI BUTTON */
 .ai-btn { background: linear-gradient(135deg, var(--dark), var(--primary)); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.15s; font-family: 'Epilogue', sans-serif; }
@@ -413,6 +432,19 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
             <button class="ai-btn" onclick="parseScope()" id="ai-parse-btn"><span>✦</span> Analizar con IA <span class="ai-badge">IA</span></button>
             <button class="btn btn-ghost" onclick="openCatalogPicker()">⊞ Agregar del catálogo</button>
             <button class="btn btn-ghost btn-sm" onclick="addBlankLineItem()">+ Agregar partida</button>
+          </div>
+
+          <!-- Reference photos (internal): client's to-do list / work site -->
+          <div class="photos-block">
+            <div class="photos-head">
+              <span class="section-subtitle">📷 Fotos del trabajo <span id="q-photos-count" class="photos-count"></span></span>
+              <span class="photos-hint">Solo para uso interno — no se envían al cliente.</span>
+            </div>
+            <div id="q-photos-grid" class="photos-grid"></div>
+            <label class="photos-add">
+              <input type="file" id="q-photos-input" accept="image/*" multiple capture="environment" style="display:none;" onchange="onPhotoInput(this)" />
+              <span>＋ Agregar fotos</span>
+            </label>
           </div>
         </div>
 
@@ -670,6 +702,11 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 
 <div class="toast" id="toast"></div>
 
+<div class="photo-lightbox" id="photo-lightbox" onclick="closePhotoLightbox()">
+  <img id="photo-lightbox-img" src="" alt="" onclick="event.stopPropagation()" />
+  <button class="photo-lightbox-close" onclick="closePhotoLightbox()">✕</button>
+</div>
+
 <script>
 // ============================================================
 // SUPABASE CONFIG
@@ -683,6 +720,9 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ============================================================
 let currentUser = null;
 let currentLineItems = [];
+// Reference photos for the quote being edited (see PHOTO block below).
+let currentQuotePhotos = [];
+const PHOTO_BUCKET = 'quote-photos';
 let pdfStyle = 'itemized';
 let settingsCache = {};
 let catalogCache = [];
@@ -951,6 +991,13 @@ async function saveClient() {
 async function loadAndRenderQuotes() {
   const { data } = await sb.from('quotes').select('*').order('created_at', { ascending: false });
   quotesCache = data || [];
+  // Tally reference-photo counts per quote (small table; one lightweight query).
+  try {
+    const { data: ph } = await sb.from('quote_photos').select('quote_id');
+    const counts = {};
+    (ph || []).forEach(r => { counts[r.quote_id] = (counts[r.quote_id] || 0) + 1; });
+    quotesCache.forEach(q => { q._photoCount = counts[q.id] || 0; });
+  } catch (e) { /* photos are optional — never block the list */ }
   renderQuotesList();
   renderStats();
 }
@@ -1092,6 +1139,7 @@ function quoteCard(quote) {
       </div>
       <div class="q-meta">
         ${cd ? `<span class="countdown ${cd.cls}" id="cd-${quote.id}">${cd.text}</span>` : ''}
+        ${quote._photoCount ? `<span class="q-photo-badge" title="${quote._photoCount} foto(s)">📷 ${quote._photoCount}</span>` : ''}
         ${quote.grand_total ? `<span class="q-price">$${(quote.grand_total||0).toFixed(0)}</span>` : ''}
         ${gauge}
         ${primaryActionHtml(quote)}
@@ -1275,6 +1323,7 @@ async function loadQuoteForEditing(id) {
   document.getElementById('save-draft-btn').textContent = 'Actualizar cotización';
 
   renderLineItems();
+  loadQuotePhotos(id);
   showPage('new-quote');
   scheduleLiveMeter();
   toast(`Editando ${quote.quote_number}`, 'success');
@@ -1317,6 +1366,7 @@ async function startFromShadow(id) {
   document.getElementById('save-draft-btn').textContent = 'Guardar borrador';
 
   renderLineItems();
+  resetQuotePhotos();
   showPage('new-quote');
   scheduleLiveMeter();
   toast('Cotización nueva desde el borrador IA — el borrador queda intacto.', 'success');
@@ -1350,6 +1400,107 @@ function clearQuote() {
   setDefaultNewQuote();
   renderLiveMeterIdle('Escribe el scope y los precios para ver si tu cotización está en el rango que suele cerrar.');
   renderLineItems();
+  resetQuotePhotos();
+}
+
+// ============================================================
+// REFERENCE PHOTOS (internal — client's to-do list / work site)
+// New quotes buffer photos locally and flush on save; existing quotes
+// (editingQuoteId set) upload immediately so nothing is lost on navigate.
+// ============================================================
+function resetQuotePhotos() {
+  currentQuotePhotos.forEach(p => { if (p.previewUrl && p.blob) URL.revokeObjectURL(p.previewUrl); });
+  currentQuotePhotos = [];
+  renderQuotePhotos();
+}
+
+// Downscale to <=1600px longest edge, JPEG 0.7 — keeps uploads ~300KB.
+async function compressImage(file, maxDim = 1600, quality = 0.7) {
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
+    let w = img.naturalWidth, h = img.naturalHeight;
+    if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(img.src);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+    return blob || file;
+  } catch (e) { return file; }
+}
+
+async function onPhotoInput(input) {
+  const files = Array.from(input.files || []); input.value = '';
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    const blob = await compressImage(f);
+    const p = { key: uid(), caption: '', blob, previewUrl: URL.createObjectURL(blob), uploaded: false, uploading: false };
+    currentQuotePhotos.push(p);
+    renderQuotePhotos();
+    if (editingQuoteId) await uploadPhoto(p, editingQuoteId);
+  }
+}
+
+async function uploadPhoto(p, quoteId) {
+  if (p.uploaded || p.uploading) return;
+  p.uploading = true; renderQuotePhotos();
+  const path = `${quoteId}/${p.key}.jpg`;
+  const { error } = await sb.storage.from(PHOTO_BUCKET).upload(path, p.blob, { contentType: 'image/jpeg', upsert: true });
+  if (error) { p.uploading = false; renderQuotePhotos(); toast('No se pudo subir la foto: ' + error.message, 'error'); return; }
+  const { data: row } = await sb.from('quote_photos').insert({ quote_id: quoteId, storage_path: path, source: 'upload' }).select('id').single();
+  p.storage_path = path; p.id = row ? row.id : null; p.uploaded = true; p.uploading = false;
+  renderQuotePhotos();
+}
+
+// Called after a brand-new quote is inserted, to persist its buffered photos.
+async function flushBufferedPhotos(quoteId) {
+  for (const p of currentQuotePhotos) { if (!p.uploaded) await uploadPhoto(p, quoteId); }
+}
+
+async function removeQuotePhoto(key) {
+  const i = currentQuotePhotos.findIndex(p => p.key === key); if (i < 0) return;
+  const p = currentQuotePhotos[i];
+  if (p.uploaded) {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    if (p.storage_path) await sb.storage.from(PHOTO_BUCKET).remove([p.storage_path]);
+    if (p.id) await sb.from('quote_photos').delete().eq('id', p.id);
+  }
+  if (p.previewUrl && p.blob) URL.revokeObjectURL(p.previewUrl);
+  currentQuotePhotos.splice(i, 1);
+  renderQuotePhotos();
+}
+
+// Load an existing quote's photos as signed URLs (private bucket).
+async function loadQuotePhotos(quoteId) {
+  resetQuotePhotos();
+  const { data: rows } = await sb.from('quote_photos').select('*').eq('quote_id', quoteId).order('created_at');
+  for (const r of (rows || [])) {
+    const { data: signed } = await sb.storage.from(PHOTO_BUCKET).createSignedUrl(r.storage_path, 3600);
+    currentQuotePhotos.push({ key: r.id, id: r.id, storage_path: r.storage_path, caption: r.caption || '', previewUrl: signed ? signed.signedUrl : '', uploaded: true, uploading: false });
+  }
+  renderQuotePhotos();
+}
+
+function renderQuotePhotos() {
+  const wrap = document.getElementById('q-photos-grid'); if (!wrap) return;
+  wrap.innerHTML = currentQuotePhotos.map(p => `
+    <div class="q-photo${p.uploading ? ' uploading' : ''}">
+      <img src="${p.previewUrl}" onclick="openPhotoLightbox('${p.key}')" alt="foto del trabajo" />
+      ${p.uploading ? '<span class="q-photo-spin"><span class="spinner"></span></span>' : ''}
+      <button class="q-photo-del" title="Eliminar" onclick="event.stopPropagation();removeQuotePhoto('${p.key}')">✕</button>
+    </div>`).join('');
+  const c = document.getElementById('q-photos-count');
+  if (c) c.textContent = currentQuotePhotos.length ? `(${currentQuotePhotos.length})` : '';
+}
+
+function openPhotoLightbox(key) {
+  const p = currentQuotePhotos.find(x => x.key === key); if (!p || !p.previewUrl) return;
+  document.getElementById('photo-lightbox-img').src = p.previewUrl;
+  document.getElementById('photo-lightbox').style.display = 'flex';
+}
+function closePhotoLightbox() {
+  const lb = document.getElementById('photo-lightbox');
+  lb.style.display = 'none';
+  document.getElementById('photo-lightbox-img').src = '';
 }
 
 function addBlankLineItem() {
@@ -1697,6 +1848,9 @@ async function persistQuote(status) {
     if (!exists) { await sb.from('catalog').insert({ description: item.description, category: item.category, unit_cost: item.unit_cost, default_qty: item.quantity, unit: item.unit, use_count: 1 }); }
   }
   await loadCatalog();
+
+  // Persist any photos buffered before this new quote existed (needs quote.id).
+  await flushBufferedPhotos(quote.id);
 
   // Increment counter only after a successful save
   quoteCounter++;
