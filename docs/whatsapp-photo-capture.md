@@ -24,10 +24,14 @@ the photo-enabled editor yet.
 
 ---
 
-## 1. One-time DB helper (phone → open quote)
+## 1. One-time DB helper (phone → open quote) — ✅ ALREADY INSTALLED
+
+> Status: this RPC and the dedup column/index below are **already applied and tested**
+> on the live DB (matches plain, `1`-prefixed, and `whatsapp:+1 (…)` formats via
+> last-10-digit comparison). Shown here for reference; no need to re-run.
 
 Client phone formats differ (`(787) 555-0142` vs WhatsApp's `17875550142`), so match
-on the **last 10 digits**. Add this RPC once:
+on the **last 10 digits**:
 
 ```sql
 create or replace function public.find_open_quote_for_phone(p_phone text)
