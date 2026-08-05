@@ -200,7 +200,8 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 .q-photo-spin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .q-photo-del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(20,37,67,0.72); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .q-photo-del:hover { background: var(--red); }
-.photos-add { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 14px; border: 1.5px dashed var(--border); border-radius: 8px; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; background: #fff; }
+.photos-add-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.photos-add { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1.5px dashed var(--border); border-radius: 8px; color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer; background: #fff; }
 .photos-add:hover { border-color: var(--primary); background: #f5f8ff; }
 .q-photo-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--mid); }
 .photo-lightbox { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(10,16,30,0.86); align-items: center; justify-content: center; padding: 24px; }
@@ -441,10 +442,18 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
               <span class="photos-hint">Solo para uso interno — no se envían al cliente.</span>
             </div>
             <div id="q-photos-grid" class="photos-grid"></div>
-            <label class="photos-add">
-              <input type="file" id="q-photos-input" accept="image/*" multiple capture="environment" style="display:none;" onchange="onPhotoInput(this)" />
-              <span>＋ Agregar fotos</span>
-            </label>
+            <div class="photos-add-row">
+              <!-- Camera: capture hint opens the camera directly (one shot at a time) -->
+              <label class="photos-add">
+                <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="onPhotoInput(this)" />
+                <span>📷 Cámara</span>
+              </label>
+              <!-- Library: no capture attr → native picker (multiple from gallery / files) -->
+              <label class="photos-add">
+                <input type="file" accept="image/*" multiple style="display:none;" onchange="onPhotoInput(this)" />
+                <span>🖼 Galería</span>
+              </label>
+            </div>
           </div>
         </div>
 
