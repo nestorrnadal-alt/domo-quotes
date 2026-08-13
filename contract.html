@@ -20,6 +20,7 @@
   .head-inner{max-width:760px;margin:0 auto;padding:26px 18px 30px;}
   .logo{font-size:26px;font-weight:800;letter-spacing:-.02em;color:#fff;}
   .logo .dot{color:var(--cyan);}
+  .logo-img{height:34px;width:auto;display:block;}
   .doc-kicker{margin-top:16px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);font-weight:700;}
   .doc-title{font-size:clamp(24px,5vw,32px);font-weight:800;margin:4px 0 0;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
@@ -78,8 +79,9 @@
 <body>
 <header>
   <div class="head-inner">
-    <div class="logo">domo<span class="dot">.</span></div>
-    <div class="doc-kicker">Service Agreement</div>
+    <img class="logo-img" src="https://dp3d2hb4975es.cloudfront.net/uploads/domo/2026/6/1/1780335566logosmall1.png" alt="Domo" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block';" />
+    <div class="logo" id="logo-fallback" style="display:none;">domo<span class="dot">.</span></div>
+    <div class="doc-kicker">Construction Services Agreement</div>
     <div class="doc-title" id="doc-title">Home Project Agreement</div>
   </div>
 </header>
@@ -96,10 +98,26 @@ const SUPABASE_URL = 'https://mpgljurndbfusxtcrogr.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_eSqiIIUFZck9XFdpgE3Ctg_u3-lBI88';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// Commercial terms snapshotted per contract (may be overridden by the contract row):
 const DEFAULT_TERMS = {
-  guarantee: "Domo stands behind its work. If any part of the completed work does not meet the agreed scope, notify us within 30 days of completion and we will correct it at no additional labor cost. This guarantee does not cover damage from misuse, normal wear, or work performed by others.",
-  change_order: "Any change to the scope, materials, or price described in this agreement must be approved in writing (email or WhatsApp is fine) before the additional work begins. Approved changes may adjust the total price and the schedule.",
-  cancellation: "Either party may cancel before work begins. If the Client cancels after the deposit is paid, the deposit applies to scheduling, evaluation, and any materials already ordered, and is non-refundable to that extent. Any remaining balance beyond costs already incurred will be refunded."
+  guarantee: "Domo warrants its workmanship for one (1) year from substantial completion. If work performed under this agreement fails to meet the agreed scope due to faulty workmanship, notify Domo in writing within the warranty period and Domo will correct it at no additional labor cost. Manufacturer warranties on materials and equipment pass through to the Client. This warranty does not cover damage from misuse, neglect, normal wear, movement or settling of the structure, water intrusion from causes outside the scope, or work altered or performed by others.",
+  change_order: "Any change to the scope, materials, quantities, or price must be documented in a written change order (email or WhatsApp is acceptable) and approved by both parties before the additional work begins. Approved change orders adjust the contract price and the schedule accordingly. Concealed or unforeseen conditions discovered during the work (e.g. hidden damage, code issues) are handled as change orders.",
+  cancellation: "Either party may cancel before work begins with written notice. If the Client cancels after the deposit is paid, the deposit is applied to scheduling, evaluation, design, and any materials or equipment already ordered or restocking fees incurred, and is non-refundable to that extent; any excess is refunded. If the Client cancels after work has begun, the Client pays for all work performed and materials supplied through the cancellation date."
+};
+
+// Standard construction clauses rendered on every agreement (boilerplate):
+const STANDARD_CLAUSES = {
+  exclusions: "Unless expressly listed in the scope of work, this agreement excludes: permits and government fees; architectural or engineering services; hazardous-material testing or abatement (asbestos, mold, lead); moving or protecting the Client's furnishings and belongings; work on concealed conditions not reasonably visible at the time of quoting; and any work not described in the scope.",
+  timeline: "Domo will begin and complete the work on a schedule communicated to the Client. Start and completion dates are good-faith estimates and may be adjusted for change orders, weather, permit delays, material availability, Client-caused delays, or events beyond Domo's reasonable control (force majeure). Time is not of the essence unless a specific completion date is stated in writing.",
+  permits: "Where permits are required, the party identified in the scope is responsible for obtaining them; if not stated, the Client authorizes Domo to obtain required permits and reimburses their actual cost. The Client warrants it has the authority to permit the work at the property and will provide any homeowner-association or landlord approvals needed.",
+  insurance: "Domo carries general liability insurance and maintains Puerto Rico workers' compensation coverage through the Corporación del Fondo del Seguro del Estado (CFSE) for its personnel. Certificates are available on request. Each party is responsible for its own negligence, and each indemnifies the other against third-party claims arising from its own negligent acts or omissions in connection with the work.",
+  materials: "Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Substitutions of equivalent quality may be made when a specified item is unavailable. Title to and risk of loss for materials pass to the Client upon delivery to the site or upon payment, whichever is earlier. Materials outside the described scope are billed separately with receipts.",
+  site: "The Client provides safe and reasonable access to the work area during working hours, along with water and electricity at the site at no charge to Domo. The Client is responsible for clearing and protecting personal property in the work area. Domo is not responsible for pre-existing conditions or for damage to items the Client failed to remove or disclose.",
+  cleanup: "Domo removes its debris and leaves the work area in broom-clean condition at completion. Disposal of construction debris is included only where stated in the scope; otherwise it is billed at cost.",
+  termination: "Either party may terminate this agreement for material breach if the breach is not cured within ten (10) days of written notice. Upon termination, the Client pays for all work performed and materials supplied through the termination date, plus any non-cancellable commitments. Non-payment is a material breach and entitles Domo to suspend work.",
+  liens: "Domo and its suppliers retain any lien rights provided by Puerto Rico law until paid in full. Upon final payment, Domo provides a release of any lien rights for the work covered by that payment.",
+  disputes: "This agreement is governed by the laws of the Commonwealth of Puerto Rico. The parties will first attempt to resolve any dispute in good faith directly. Unresolved disputes are subject to the courts of Puerto Rico. The prevailing party in any action to enforce this agreement is entitled to its reasonable attorney's fees and costs.",
+  general: "Domo performs as an independent contractor, not an employee or partner of the Client. This agreement, together with the referenced quote and any signed change orders, is the entire agreement between the parties and supersedes prior discussions. If any provision is unenforceable, the remainder stays in effect. This agreement may be signed electronically, and an electronic signature has the same effect as a handwritten one."
 };
 
 const params = new URLSearchParams(location.search);
@@ -133,7 +151,8 @@ function showState(msg){
 function setFooter(){
   const name = company.company_name || 'Domo';
   const bits = [name, company.company_phone, company.company_email, company.company_website].filter(Boolean).map(esc);
-  document.getElementById('foot').innerHTML = bits.join(' · ');
+  document.getElementById('foot').innerHTML = bits.join(' · ')
+    + '<div style="margin-top:8px;font-size:11px;color:var(--faint);max-width:600px;margin-left:auto;margin-right:auto;">This agreement is a general construction services contract and is not legal advice. Terms should be reviewed by qualified counsel for your situation.</div>';
 }
 
 function render(){
@@ -183,6 +202,11 @@ function render(){
 
   const voidBlock = c.status==='void' ? `<div class="card"><div class="state-msg">This agreement has been voided by Domo. Please contact us for an updated version.</div></div>` : '';
 
+  const clause = (title, body) => `<h2 class="sec">${title}</h2><div class="terms"><p>${esc(body)}</p></div>`;
+  const defaultPay = deposit>0
+    ? `A deposit of ${money(deposit)} is due on signing to schedule the work. The remaining ${money(balance)} is billed in progress as the work advances; each progress invoice is due within 15 days of its invoice date. Balances unpaid after 15 days accrue interest at 1.5% per month.`
+    : `Work is billed in progress as it advances; each invoice is due within 15 days of its invoice date. Late balances accrue interest at 1.5% per month.`;
+
   el.innerHTML = `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -193,7 +217,7 @@ function render(){
       <h2 class="sec">Parties</h2>
       <div class="parties">
         <div class="party">
-          <div class="role">Service provider</div>
+          <div class="role">Contractor</div>
           <div class="name">${esc(companyName)}</div>
           <div class="meta">${[company.company_phone,company.company_email].filter(Boolean).map(esc).join('<br>')||'Puerto Rico'}</div>
         </div>
@@ -206,26 +230,32 @@ function render(){
 
       <h2 class="sec">Scope of work</h2>
       <div class="scope-box">${esc(c.scope||'See attached quote.')}</div>
+      ${clause('Exclusions', STANDARD_CLAUSES.exclusions)}
 
-      <h2 class="sec">Price</h2>
+      <h2 class="sec">Contract price</h2>
       <div class="price-grid">
         <div class="lbl">Total</div><div class="val total">${money(total)}</div>
-        ${deposit>0?`<div class="lbl deposit">Deposit due on signing</div><div class="val deposit">${money(deposit)}${c.deposit_percent?` (${esc(c.deposit_percent)}%)`:''}</div>`:''}
-        ${deposit>0?`<div class="lbl">Balance</div><div class="val">${money(balance)}</div>`:''}
+        ${deposit>0?`<div class="lbl deposit">Deposit due on signing</div><div class="val deposit">${money(deposit)}${c.deposit_percent?` (~${esc(c.deposit_percent)}%)`:''}</div>`:''}
+        ${deposit>0?`<div class="lbl">Balance (billed in progress)</div><div class="val">${money(balance)}</div>`:''}
       </div>
       <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">Prices are in USD. Applicable IVU is included as shown on your quote. Materials outside the described scope are billed separately with receipts.</p>
 
       <h2 class="sec">Payment schedule</h2>
-      <div class="terms"><p>${esc(c.payment_terms || (deposit>0? `A deposit of ${money(deposit)} is due on signing to schedule the work. The remaining ${money(balance)} is due on completion.` : 'Payment is due on completion.'))}</p></div>
+      <div class="terms"><p>${esc(c.payment_terms || defaultPay)}</p></div>
 
-      <h2 class="sec">Changes to the work</h2>
-      <div class="terms"><p>${esc(terms.change_order)}</p></div>
-
-      <h2 class="sec">Guarantee</h2>
-      <div class="terms"><p>${esc(terms.guarantee)}</p></div>
-
-      <h2 class="sec">Cancellation</h2>
-      <div class="terms"><p>${esc(terms.cancellation)}</p></div>
+      ${clause('Schedule', STANDARD_CLAUSES.timeline)}
+      ${clause('Changes to the work', terms.change_order)}
+      ${clause('Permits &amp; licenses', STANDARD_CLAUSES.permits)}
+      ${clause("Insurance &amp; workers' compensation", STANDARD_CLAUSES.insurance)}
+      ${clause('Materials, title &amp; risk of loss', STANDARD_CLAUSES.materials)}
+      ${clause('Site access &amp; utilities', STANDARD_CLAUSES.site)}
+      ${clause('Cleanup', STANDARD_CLAUSES.cleanup)}
+      ${clause('Workmanship warranty', terms.guarantee)}
+      ${clause('Termination &amp; default', STANDARD_CLAUSES.termination)}
+      ${clause('Liens', STANDARD_CLAUSES.liens)}
+      ${clause('Cancellation', terms.cancellation)}
+      ${clause('Dispute resolution &amp; governing law', STANDARD_CLAUSES.disputes)}
+      ${clause('General', STANDARD_CLAUSES.general)}
     </div>
     ${signedBlock}${signForm}${voidBlock}`;
 

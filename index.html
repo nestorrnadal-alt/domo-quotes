@@ -371,6 +371,10 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 .pf-m.warn{background:#fef7e6;border-color:#f0dfb0;} .pf-m.warn b{color:#8a6d00;}
 .pf-m.bad{background:#fdecea;border-color:#f2c4be;} .pf-m.bad b{color:#b3261e;}
 .pf-add{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;}
+.pf-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px;}
+.pf-strip .pf-cell.badge.ok b{color:var(--green);}
+.pf-strip .pf-cell.badge.warn b{color:#8a6d00;}
+.pf-strip .pf-cell.badge.bad b{color:var(--red);}
 .pf-section{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mid);font-weight:700;margin:18px 0 8px;}
 .pf-table{width:100%;border-collapse:collapse;font-size:14px;}
 .pf-table th,.pf-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
@@ -1902,17 +1906,21 @@ const CONTRACT_DEFAULT_TERMS = {
   cancellation: "Either party may cancel before work begins. If the Client cancels after the deposit is paid, the deposit applies to scheduling, evaluation, and any materials already ordered, and is non-refundable to that extent. Any remaining balance beyond costs already incurred will be refunded.",
 };
 
+// Deposit rounded to the nearest $50 for a clean number on the contract.
+function roundedDeposit(total, pct) { return Math.round((total * pct / 100) / 50) * 50; }
+
 function cmRecompute() {
   const total = parseFloat(document.getElementById('cm-total').value) || 0;
   const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
-  const deposit = Math.round(total * pct / 100 * 100) / 100;
+  const deposit = roundedDeposit(total, pct);
   const balance = Math.max(0, total - deposit);
-  document.getElementById('cm-deposit-display').value = '$' + deposit.toFixed(2);
+  const f2 = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  document.getElementById('cm-deposit-display').value = f2(deposit);
   const terms = document.getElementById('cm-terms');
   if (terms && !terms.dataset.touched) {
     terms.value = deposit > 0
-      ? `A deposit of $${deposit.toFixed(2)} (${pct}%) is due on signing to schedule the work. The remaining balance of $${balance.toFixed(2)} is due on completion.`
-      : `Payment is due on completion.`;
+      ? `A deposit of ${f2(deposit)} (~${pct}%) is due on signing to schedule the work. The remaining ${f2(balance)} is billed in progress as the work advances; each progress invoice is due within 15 days of its invoice date. Balances unpaid after 15 days accrue interest at 1.5% per month.`
+      : `Work is billed in progress as it advances; each invoice is due within 15 days of its invoice date. Late balances accrue interest at 1.5% per month.`;
   }
 }
 
@@ -1936,7 +1944,7 @@ async function generateContract() {
   if (!p) return;
   const total = parseFloat(document.getElementById('cm-total').value) || 0;
   const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
-  const deposit = Math.round(total * pct / 100 * 100) / 100;
+  const deposit = roundedDeposit(total, pct);
   const terms = (document.getElementById('cm-terms').value || '').trim();
   const btn = document.getElementById('cm-generate-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generando...';
@@ -2109,7 +2117,13 @@ async function renderProfitModal() {
   }).join('');
   document.getElementById('pf-body').innerHTML = `
     <div class="modal-title" style="margin-bottom:2px;">Rentabilidad · ${esc(p.project_number||'')}</div>
-    <div style="color:var(--mid);font-size:13px;margin-bottom:16px;">${esc(p.title||'')}</div>
+    <div style="color:var(--mid);font-size:13px;margin-bottom:14px;">${esc(p.title||'')}</div>
+
+    <div class="pf-strip">
+      <div class="pf-cell"><span>Ingreso cotizado</span><b>${money(f.revenue)}</b></div>
+      <div class="pf-cell"><span>Cobrado</span><b style="color:var(--green);">${money(f.collected)}</b></div>
+      <div class="pf-cell badge ${mClass(f.plannedMargin)}"><span>Margen cotizado</span><b>${pct(f.plannedMargin)}</b></div>
+    </div>
 
     <div class="pf-section">Costos: cotizado vs. real</div>
     <table class="pf-table">
