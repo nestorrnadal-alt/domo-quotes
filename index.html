@@ -345,6 +345,17 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 .proj-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;color:#3652A5;background:#e6ebfa;white-space:nowrap;}
 .proj-flag{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--mid);white-space:nowrap;cursor:pointer;}
 .proj-flag input{accent-color:#3652A5;cursor:pointer;width:14px;height:14px;}
+.bm-rollup{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+.bm-rollup > div{background:var(--cream);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:2px;}
+.bm-rollup span{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);font-weight:700;}
+.bm-rollup b{font-size:16px;font-variant-numeric:tabular-nums;}
+.bm-table{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+.bm-row{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--border);border-radius:9px;}
+.bm-title{font-size:14px;font-weight:600;}
+.bm-amt{font-variant-numeric:tabular-nums;font-weight:700;}
+.bm-act{display:flex;gap:6px;align-items:center;}
+.bm-add{display:flex;gap:8px;align-items:center;margin-top:6px;}
+@media(max-width:560px){.bm-rollup{grid-template-columns:repeat(2,1fr);}.bm-row{grid-template-columns:1fr auto;}}
 </style>
 </head>
 <body>
@@ -766,6 +777,14 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
       <button class="btn btn-ghost" onclick="closeModal('contract-modal')">Cancelar</button>
       <button class="btn btn-amber" onclick="generateContract()" id="cm-generate-btn">Generar contrato</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="billing-modal">
+  <div class="modal" style="max-width:660px;">
+    <input type="hidden" id="bm-project-id" />
+    <div id="bm-body"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('billing-modal')">Cerrar</button></div>
   </div>
 </div>
 
@@ -1439,8 +1458,26 @@ async function loadAndRenderProjects() {
       projectsCache.forEach(p => { p._contract = byProj[p.id] || null; });
     }
   } catch (e) { /* contracts optional — never block the list */ }
+  // Attach billing milestones (schedule of values) per project.
+  try {
+    const ids = projectsCache.map(p => p.id);
+    if (ids.length) {
+      const { data: mil } = await sb.from('project_milestones').select('*').in('project_id', ids).order('sort_order');
+      const byP = {};
+      (mil || []).forEach(m => { (byP[m.project_id] = byP[m.project_id] || []).push(m); });
+      projectsCache.forEach(p => { p._milestones = byP[p.id] || []; });
+    }
+  } catch (e) { /* milestones optional — never block the list */ }
   renderProjectStats();
   renderProjectsList();
+}
+
+function billingRollup(ms) {
+  ms = ms || [];
+  const total    = ms.reduce((s, m) => s + (+m.amount || 0), 0);
+  const invoiced = ms.filter(m => m.status === 'invoiced' || m.status === 'paid').reduce((s, m) => s + (+m.amount || 0), 0);
+  const paid     = ms.filter(m => m.status === 'paid').reduce((s, m) => s + (+m.amount || 0), 0);
+  return { total, invoiced, paid, remaining: Math.max(0, total - paid), count: ms.length };
 }
 
 function renderProjectStats() {
@@ -1515,8 +1552,19 @@ function projectCard(p) {
         <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;">Contrato</span>
         ${contractControlsHtml(p)}
       </div>
+      <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;">Facturación</span>
+        ${billingControlsHtml(p)}
+      </div>
     </div>`;
   return el;
+}
+
+function billingControlsHtml(p) {
+  const r = billingRollup(p._milestones);
+  const btn = `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openBillingModal('${p.id}')">🧾 Ver facturación${r.count ? ` (${r.count})` : ''}</button>`;
+  if (!r.count) return btn;
+  return `${btn} <span class="proj-chip">Cobrado $${r.paid.toFixed(0)} / $${r.total.toFixed(0)}</span>`;
 }
 
 // Contract controls shown per project card.
@@ -1659,6 +1707,102 @@ async function toggleDepositPaid(id, checked) {
   await sb.from('contracts').update({ deposit_paid_at: val }).eq('id', id);
   const p = projectsCache.find(x => x._contract && x._contract.id === id);
   if (p && p._contract) p._contract.deposit_paid_at = val;
+}
+
+// ---- Progress invoicing (Step 3) — schedule of values per project ----
+let bmProjectId = null;
+
+function openBillingModal(pid) {
+  bmProjectId = pid;
+  document.getElementById('bm-project-id').value = pid;
+  document.getElementById('billing-modal').classList.add('open');
+  renderBillingModal();
+}
+
+async function renderBillingModal() {
+  const p = projectsCache.find(x => x.id === bmProjectId);
+  if (!p) return;
+  const { data } = await sb.from('project_milestones').select('*').eq('project_id', bmProjectId).order('sort_order');
+  p._milestones = data || [];
+  const ms = p._milestones, r = billingRollup(ms);
+  const PILL = { pending:['Pendiente','#eef1f9','#7a8aaa'], invoiced:['Facturado','#e6ebfa','#3652A5'], paid:['Cobrado','#e6f4ea','#2d6a4f'] };
+  const rows = ms.map(m => {
+    const pill = PILL[m.status] || ['—','#eee','#666'];
+    const act = [];
+    if (m.status === 'pending') act.push(`<button class="btn btn-ghost btn-sm" onclick="markMilestoneInvoiced('${m.id}')">Facturar</button>`);
+    if (m.status === 'invoiced') act.push(`<button class="btn btn-green btn-sm" onclick="markMilestonePaid('${m.id}')">Cobrado</button>`);
+    if (m.status === 'paid' && m.paid_at) act.push(`<span style="font-size:11px;color:var(--mid);">${fmtSentDate(m.paid_at)}</span>`);
+    act.push(`<button class="btn btn-danger btn-sm" onclick="deleteMilestone('${m.id}')">✕</button>`);
+    return `<div class="bm-row">
+        <div class="bm-title">${esc(m.title)}${m.bk_invoice_id ? ` <span style="font-size:11px;color:var(--mid);">BK ${esc(m.bk_invoice_id)}</span>` : ''}</div>
+        <div class="bm-amt">$${(+m.amount||0).toFixed(2)}</div>
+        <div><span class="proj-chip" style="background:${pill[1]};color:${pill[2]};">${pill[0]}</span></div>
+        <div class="bm-act">${act.join(' ')}</div>
+      </div>`;
+  }).join('');
+  const genBtn = (ms.length === 0 && p._contract)
+    ? `<button class="btn btn-ghost btn-sm" onclick="generateMilestonesFromContract('${p.id}')">✨ Generar desde contrato (depósito + balance)</button>` : '';
+  document.getElementById('bm-body').innerHTML = `
+    <div class="modal-title" style="margin-bottom:2px;">Facturación · ${esc(p.project_number||'')}</div>
+    <div style="color:var(--mid);font-size:13px;margin-bottom:14px;">${esc(p.title||'')}</div>
+    <div class="bm-rollup">
+      <div><span>Total</span><b>$${r.total.toFixed(0)}</b></div>
+      <div><span>Facturado</span><b style="color:var(--primary);">$${r.invoiced.toFixed(0)}</b></div>
+      <div><span>Cobrado</span><b style="color:var(--green);">$${r.paid.toFixed(0)}</b></div>
+      <div><span>Pendiente</span><b>$${r.remaining.toFixed(0)}</b></div>
+    </div>
+    <div class="bm-table">${rows || '<div style="color:var(--mid);font-size:13px;padding:6px 0;">Aún no hay hitos de facturación.</div>'}</div>
+    ${genBtn}
+    <div class="bm-add">
+      <input type="text" id="bm-new-title" placeholder="Nuevo hito (ej. Rough-in)" class="form-input" style="flex:2;min-width:0;" />
+      <input type="number" id="bm-new-amount" placeholder="$0" class="form-input" style="flex:1;min-width:0;" />
+      <button class="btn btn-amber btn-sm" onclick="addMilestone()">Añadir</button>
+    </div>`;
+}
+
+async function addMilestone() {
+  const title = (document.getElementById('bm-new-title').value || '').trim();
+  const amount = parseFloat(document.getElementById('bm-new-amount').value) || 0;
+  if (!title) { toast('Escribe un nombre para el hito.', 'error'); return; }
+  const p = projectsCache.find(x => x.id === bmProjectId);
+  const order = (p && p._milestones ? p._milestones.length : 0);
+  await sb.from('project_milestones').insert({ project_id: bmProjectId, title, amount, sort_order: order, status: 'pending' });
+  await renderBillingModal();
+  loadAndRenderProjects();
+}
+
+async function markMilestoneInvoiced(id) {
+  const bk = (prompt('Número de factura de BookingKoala (opcional):', '') || '').trim();
+  await sb.from('project_milestones').update({ status: 'invoiced', invoiced_at: new Date().toISOString(), bk_invoice_id: bk || null }).eq('id', id);
+  await renderBillingModal();
+  loadAndRenderProjects();
+}
+
+async function markMilestonePaid(id) {
+  await sb.from('project_milestones').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', id);
+  await renderBillingModal();
+  loadAndRenderProjects();
+}
+
+async function deleteMilestone(id) {
+  if (!confirm('¿Eliminar este hito de facturación?')) return;
+  await sb.from('project_milestones').delete().eq('id', id);
+  await renderBillingModal();
+  loadAndRenderProjects();
+}
+
+// Seed the schedule of values from the signed/generated contract: deposit + balance.
+async function generateMilestonesFromContract(pid) {
+  const p = projectsCache.find(x => x.id === pid);
+  if (!p || !p._contract) return;
+  const c = p._contract;
+  const total = +c.contract_total || 0, dep = +c.deposit_amount || 0, bal = Math.max(0, total - dep);
+  const rows = [];
+  if (dep > 0) rows.push({ project_id: pid, title: 'Depósito', amount: dep, sort_order: 0, status: c.deposit_paid_at ? 'paid' : 'pending', paid_at: c.deposit_paid_at || null });
+  rows.push({ project_id: pid, title: 'Balance final', amount: bal > 0 ? bal : total, sort_order: 1, status: 'pending' });
+  await sb.from('project_milestones').insert(rows);
+  await renderBillingModal();
+  loadAndRenderProjects();
 }
 
 // ============================================================

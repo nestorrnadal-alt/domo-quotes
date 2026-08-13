@@ -109,4 +109,18 @@ to token-scoped policies is a planned hardening pass across the quote app.
       compliance gate. Syntax + headless load verified.
 - [x] Step 2: contracts table + sign trigger (verified) + admin generate/send +
       public signing page (`contract.html`). Syntax + headless load verified.
-- [ ] Step 3: progress invoicing (schedule of values over BookingKoala).
+- [x] Step 3: progress invoicing — `project_milestones` (schedule of values),
+      billing modal with roll-up (total / invoiced / collected / remaining),
+      per-milestone pending→invoiced→paid with the BK invoice # captured,
+      "generate from contract" seed. Roll-up verified against the DB.
+- [ ] Step 4: compliance package assembly (Fondo/CFSE + COI + permits in one place).
+- [ ] Step 5: per-project profitability (budget vs actual).
+
+## Progress invoicing (Step 3)
+
+`project_milestones` is the schedule of values BookingKoala lacks: one project,
+many billing milestones, each `pending → invoiced → paid`. BK stays the charging
+engine — marking a milestone *invoiced* captures its **BK invoice #** (manual for
+now; automating the BK push via the BK API is the follow-on). The billing modal
+rolls up **total / invoiced / collected / remaining**, and "Generar desde
+contrato" seeds a Depósito + Balance from the contract to start.
