@@ -747,6 +747,28 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
   </div>
 </div>
 
+<div class="modal-overlay" id="contract-modal">
+  <div class="modal">
+    <div class="modal-title">Generar contrato</div>
+    <input type="hidden" id="cm-project-id" />
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Total del contrato ($)</label><input class="form-input" type="number" id="cm-total" oninput="cmRecompute()" /></div>
+      <div class="form-group"><label class="form-label">Depósito %</label><input class="form-input" type="number" id="cm-deposit-pct" value="30" min="0" max="100" oninput="cmRecompute()" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Depósito a cobrar</label><input class="form-input" id="cm-deposit-display" readonly style="background:var(--cream);font-weight:700;" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Calendario de pago (aparece en el contrato, en inglés)</label><textarea class="form-textarea" id="cm-terms" rows="3"></textarea></div>
+    </div>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:12px;">El alcance se toma de la cotización. Garantía, cambios y cancelación usan los términos estándar de Domo (en inglés). Después de generar, copia el enlace de firma para enviárselo al cliente.</div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('contract-modal')">Cancelar</button>
+      <button class="btn btn-amber" onclick="generateContract()" id="cm-generate-btn">Generar contrato</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <div class="photo-lightbox" id="photo-lightbox" onclick="closePhotoLightbox()">
@@ -1407,6 +1429,16 @@ async function promoteToProject(quoteId, btn) {
 async function loadAndRenderProjects() {
   const { data } = await sb.from('projects').select('*').order('created_at', { ascending: false });
   projectsCache = data || [];
+  // Attach the latest contract per project (for the contract controls on the card).
+  try {
+    const ids = projectsCache.map(p => p.id);
+    if (ids.length) {
+      const { data: cons } = await sb.from('contracts').select('*').in('project_id', ids).order('created_at', { ascending: false });
+      const byProj = {};
+      (cons || []).forEach(c => { if (!byProj[c.project_id]) byProj[c.project_id] = c; }); // first seen = latest
+      projectsCache.forEach(p => { p._contract = byProj[p.id] || null; });
+    }
+  } catch (e) { /* contracts optional — never block the list */ }
   renderProjectStats();
   renderProjectsList();
 }
@@ -1479,8 +1511,33 @@ function projectCard(p) {
         ${p.primary_quote_id ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openProjectQuote('${p.primary_quote_id}')">Ver cotización</button>` : ''}
         <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteProject('${p.id}')">Eliminar</button>
       </div>
+      <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;">Contrato</span>
+        ${contractControlsHtml(p)}
+      </div>
     </div>`;
   return el;
+}
+
+// Contract controls shown per project card.
+function contractControlsHtml(p) {
+  const c = p._contract;
+  if (!c) {
+    return `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openContractModal('${p.id}')">📄 Generar contrato</button>`;
+  }
+  const label = { draft:'Borrador', sent:'Enviado', signed:'✓ Firmado', void:'Anulado' }[c.status] || c.status;
+  const parts = [`<span class="proj-chip">${esc(label)}</span>`];
+  if (c.status === 'draft' || c.status === 'sent') {
+    parts.push(`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();copySignLink('${c.public_token}')">🔗 Copiar enlace de firma</button>`);
+    if (c.status === 'draft')
+      parts.push(`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();markContractSent('${c.id}')">Marcar enviado</button>`);
+  }
+  if (c.status === 'signed') {
+    parts.push(`<span style="font-size:12px;color:var(--mid);">${esc(c.signer_name||'')} · ${fmtSentDate(c.signed_at)}</span>`);
+    parts.push(`<label class="proj-flag"><input type="checkbox" ${c.deposit_paid_at?'checked':''} onchange="toggleDepositPaid('${c.id}',this.checked)"> Depósito cobrado</label>`);
+    parts.push(`<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();copySignLink('${c.public_token}')">🔗 Enlace</button>`);
+  }
+  return parts.join(' ');
 }
 
 async function updateProjectField(id, field, value) {
@@ -1510,6 +1567,98 @@ async function deleteProject(id) {
   renderProjectStats();
   renderProjectsList();
   toast('Proyecto eliminado.', 'success');
+}
+
+// ---- Contracts (Step 2) — generated from the project/quote, signed via a public link ----
+// English standard terms, snapshotted onto each contract so a signed agreement is immutable.
+const CONTRACT_DEFAULT_TERMS = {
+  guarantee: "Domo stands behind its work. If any part of the completed work does not meet the agreed scope, notify us within 30 days of completion and we will correct it at no additional labor cost. This guarantee does not cover damage from misuse, normal wear, or work performed by others.",
+  change_order: "Any change to the scope, materials, or price described in this agreement must be approved in writing (email or WhatsApp is fine) before the additional work begins. Approved changes may adjust the total price and the schedule.",
+  cancellation: "Either party may cancel before work begins. If the Client cancels after the deposit is paid, the deposit applies to scheduling, evaluation, and any materials already ordered, and is non-refundable to that extent. Any remaining balance beyond costs already incurred will be refunded.",
+};
+
+function cmRecompute() {
+  const total = parseFloat(document.getElementById('cm-total').value) || 0;
+  const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
+  const deposit = Math.round(total * pct / 100 * 100) / 100;
+  const balance = Math.max(0, total - deposit);
+  document.getElementById('cm-deposit-display').value = '$' + deposit.toFixed(2);
+  const terms = document.getElementById('cm-terms');
+  if (terms && !terms.dataset.touched) {
+    terms.value = deposit > 0
+      ? `A deposit of $${deposit.toFixed(2)} (${pct}%) is due on signing to schedule the work. The remaining balance of $${balance.toFixed(2)} is due on completion.`
+      : `Payment is due on completion.`;
+  }
+}
+
+function openContractModal(projectId) {
+  const p = projectsCache.find(x => x.id === projectId);
+  if (!p) return;
+  if (p._contract) { toast('Este proyecto ya tiene un contrato.', 'error'); return; }
+  document.getElementById('cm-project-id').value = projectId;
+  document.getElementById('cm-total').value = (p.budget_total != null ? p.budget_total : '');
+  document.getElementById('cm-deposit-pct').value = '30';
+  const terms = document.getElementById('cm-terms');
+  terms.value = ''; delete terms.dataset.touched;
+  terms.oninput = () => { terms.dataset.touched = '1'; };
+  cmRecompute();
+  document.getElementById('contract-modal').classList.add('open');
+}
+
+async function generateContract() {
+  const pid = document.getElementById('cm-project-id').value;
+  const p = projectsCache.find(x => x.id === pid);
+  if (!p) return;
+  const total = parseFloat(document.getElementById('cm-total').value) || 0;
+  const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
+  const deposit = Math.round(total * pct / 100 * 100) / 100;
+  const terms = (document.getElementById('cm-terms').value || '').trim();
+  const btn = document.getElementById('cm-generate-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generando...';
+  // Snapshot the scope from the source quote so the contract can't drift if the quote is later edited.
+  let scope = p.description || '';
+  if (p.primary_quote_id) {
+    try { const { data: q } = await sb.from('quotes').select('scope').eq('id', p.primary_quote_id).maybeSingle(); if (q && q.scope) scope = q.scope; } catch (e) {}
+  }
+  try {
+    const { error } = await sb.from('contracts').insert({
+      project_id: pid, quote_id: p.primary_quote_id || null,
+      client_name: p.client_name, client_email: p.client_email, client_property: p.client_property,
+      scope, contract_total: total, deposit_amount: deposit, deposit_percent: pct,
+      payment_terms: terms || null,
+      guarantee_terms: CONTRACT_DEFAULT_TERMS.guarantee,
+      change_order_terms: CONTRACT_DEFAULT_TERMS.change_order,
+      cancellation_terms: CONTRACT_DEFAULT_TERMS.cancellation,
+      status: 'draft',
+    });
+    if (error) throw error;
+    closeModal('contract-modal');
+    btn.disabled = false; btn.innerHTML = 'Generar contrato';
+    toast('Contrato generado. Copia el enlace de firma para enviarlo al cliente.', 'success');
+    await loadAndRenderProjects();
+  } catch (e) {
+    btn.disabled = false; btn.innerHTML = 'Generar contrato';
+    toast('No se pudo generar el contrato: ' + e.message, 'error');
+  }
+}
+
+async function copySignLink(token) {
+  const url = location.origin + '/contract.html?t=' + token;
+  try { await navigator.clipboard.writeText(url); toast('Enlace de firma copiado al portapapeles.', 'success'); }
+  catch (e) { prompt('Copia el enlace de firma:', url); }
+}
+
+async function markContractSent(id) {
+  await sb.from('contracts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', id);
+  toast('Contrato marcado como enviado.', 'success');
+  await loadAndRenderProjects();
+}
+
+async function toggleDepositPaid(id, checked) {
+  const val = checked ? new Date().toISOString() : null;
+  await sb.from('contracts').update({ deposit_paid_at: val }).eq('id', id);
+  const p = projectsCache.find(x => x._contract && x._contract.id === id);
+  if (p && p._contract) p._contract.deposit_paid_at = val;
 }
 
 // ============================================================

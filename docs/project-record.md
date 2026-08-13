@@ -71,10 +71,42 @@ is untouched:
   (+ permits, if required) clear. "Ver cotización" opens the source quote;
   "Eliminar" removes the project and unlinks (never deletes) the quote.
 
+## Contracts (Step 2)
+
+A simple **English** service agreement, generated from the project/quote and
+signed by the client through a **tokenized public link** (the main app is
+login-gated, so signing lives on its own page).
+
+- **`contracts` table** (migration `20260813_project_contracts.sql`): snapshots
+  the terms at generation (`scope`, `contract_total`, `deposit_amount`,
+  `deposit_percent`, `payment_terms`, and standard guarantee / change-order /
+  cancellation text) so a signed contract never drifts if the quote is later
+  edited. Carries a `public_token` (uuid) as the signing-link key and a
+  `status` (`draft` → `sent` → `signed` / `void`).
+- **Sign propagation trigger**: when a contract first becomes `signed`, the
+  linked project's `contract_signed_at` and `deposit_amount` are stamped
+  automatically. Verified end-to-end.
+- **Admin** (in the project card): **Generar contrato** modal (total + deposit %
+  → deposit amount + editable payment schedule), then **copy sign link**, mark
+  sent, and a **deposit-cobrado** toggle once signed.
+- **Client page** (`contract.html?t=<token>`): Domo-branded agreement with
+  scope, price, deposit, payment schedule, and standard terms; captures a typed
+  name + **drawn signature** + agreement checkbox, then writes the signature
+  back. Already-signed links render read-only.
+
+**Deposit note:** Step 2 *captures* the deposit and lets ops mark it collected.
+Actually charging it (Stripe/BK) is a later hook, deliberately out of scope here.
+
+**Security follow-up (tracked):** `contracts` uses the app's permissive
+`allow all` RLS, reachable only via the unguessable `public_token`. Tightening
+to token-scoped policies is a planned hardening pass across the quote app.
+
 ## Status
 
 - [x] Schema applied to the live `domo-quotes` Supabase project and verified
       (numbering, quote link, compliance defaults).
 - [x] App wiring — "Convertir en proyecto" action + Proyectos list with the
       compliance gate. Syntax + headless load verified.
-- [ ] Step 2: contract + deposit-on-signature (auto-generated from the quote).
+- [x] Step 2: contracts table + sign trigger (verified) + admin generate/send +
+      public signing page (`contract.html`). Syntax + headless load verified.
+- [ ] Step 3: progress invoicing (schedule of values over BookingKoala).

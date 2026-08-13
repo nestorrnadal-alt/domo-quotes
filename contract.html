@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Domo — Service Agreement</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy:#142543; --blue:#3652A5; --peri:#80A2F9; --cyan:#8BD7D7; --lime:#D6E264;
+    --ink:#142543; --soft:#48546e; --faint:#7b869e; --line:#e2e7f2; --bg:#eef1f8; --card:#fff;
+    --green:#1a7f37; --red:#b3261e;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;}
+  .wrap{max-width:760px;margin:0 auto;padding:0 18px 60px;}
+  header{background:linear-gradient(155deg,var(--navy),#1d3160 82%);color:#fff;}
+  .head-inner{max-width:760px;margin:0 auto;padding:26px 18px 30px;}
+  .logo{font-size:26px;font-weight:800;letter-spacing:-.02em;color:#fff;}
+  .logo .dot{color:var(--cyan);}
+  .doc-kicker{margin-top:16px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);font-weight:700;}
+  .doc-title{font-size:clamp(24px,5vw,32px);font-weight:800;margin:4px 0 0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 1px 2px rgba(20,37,67,.05),0 10px 30px rgba(20,37,67,.07);
+    padding:26px;margin-top:22px;}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+    padding:4px 11px;border-radius:999px;}
+  .status-pill.draft{background:#eef1f9;color:var(--soft);}
+  .status-pill.sent{background:#e6ebfa;color:var(--blue);}
+  .status-pill.signed{background:#e6f4ea;color:var(--green);}
+  .status-pill.void{background:#fce8e6;color:var(--red);}
+  h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--faint);
+    font-weight:700;margin:26px 0 8px;border-top:1px solid var(--line);padding-top:18px;}
+  .card > h2.sec:first-of-type{border-top:none;padding-top:0;margin-top:10px;}
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .party .role{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);font-weight:700;}
+  .party .name{font-weight:700;margin-top:2px;}
+  .party .meta{font-size:13px;color:var(--soft);}
+  .scope-box{white-space:pre-wrap;background:#f7f9fd;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14.5px;}
+  .price-grid{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:15px;}
+  .price-grid .lbl{color:var(--soft);}
+  .price-grid .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  .price-grid .total{font-size:18px;font-weight:800;border-top:1px solid var(--line);padding-top:10px;margin-top:4px;}
+  .price-grid .deposit{color:var(--blue);font-weight:800;}
+  .terms{font-size:14px;color:var(--soft);}
+  .terms p{margin:0 0 10px;}
+  .terms b{color:var(--ink);}
+  /* signature */
+  .sign-card{border:2px solid var(--blue);}
+  .field{margin:14px 0;}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;}
+  .field input[type=text]{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;font-size:15px;}
+  .sigpad-wrap{position:relative;}
+  #sigpad{width:100%;height:170px;border:1px dashed #b9c2da;border-radius:10px;background:#fbfcfe;touch-action:none;display:block;}
+  .sig-hint{position:absolute;left:14px;top:12px;color:#aab3c9;font-size:13px;pointer-events:none;}
+  .sig-clear{margin-top:6px;font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer;padding:2px;}
+  .agree{display:flex;gap:9px;align-items:flex-start;font-size:14px;margin:16px 0;}
+  .agree input{margin-top:3px;width:17px;height:17px;accent-color:var(--blue);flex:0 0 auto;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:700;
+    border:none;border-radius:10px;padding:14px 22px;cursor:pointer;background:var(--blue);color:#fff;width:100%;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn.lime{background:var(--lime);color:var(--navy);}
+  .note{font-size:13px;color:var(--faint);margin-top:12px;text-align:center;}
+  .center{text-align:center;}
+  .big-check{width:64px;height:64px;border-radius:50%;background:#e6f4ea;color:var(--green);
+    display:grid;place-items:center;font-size:32px;margin:0 auto 14px;}
+  .state-msg{padding:50px 20px;text-align:center;color:var(--soft);}
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+    display:inline-block;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  footer{max-width:760px;margin:0 auto;padding:20px 18px;color:var(--faint);font-size:12px;text-align:center;}
+  @media(max-width:560px){.parties{grid-template-columns:1fr;}}
+  @media print{header{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .sign-card,.btn,.sig-clear{}}
+</style>
+</head>
+<body>
+<header>
+  <div class="head-inner">
+    <div class="logo">domo<span class="dot">.</span></div>
+    <div class="doc-kicker">Service Agreement</div>
+    <div class="doc-title" id="doc-title">Home Project Agreement</div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="loading" class="state-msg">Loading your agreement…</div>
+  <div id="content" style="display:none;"></div>
+</div>
+
+<footer id="foot"></footer>
+
+<script>
+const SUPABASE_URL = 'https://mpgljurndbfusxtcrogr.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_eSqiIIUFZck9XFdpgE3Ctg_u3-lBI88';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const DEFAULT_TERMS = {
+  guarantee: "Domo stands behind its work. If any part of the completed work does not meet the agreed scope, notify us within 30 days of completion and we will correct it at no additional labor cost. This guarantee does not cover damage from misuse, normal wear, or work performed by others.",
+  change_order: "Any change to the scope, materials, or price described in this agreement must be approved in writing (email or WhatsApp is fine) before the additional work begins. Approved changes may adjust the total price and the schedule.",
+  cancellation: "Either party may cancel before work begins. If the Client cancels after the deposit is paid, the deposit applies to scheduling, evaluation, and any materials already ordered, and is non-refundable to that extent. Any remaining balance beyond costs already incurred will be refunded."
+};
+
+const params = new URLSearchParams(location.search);
+const token = params.get('t') || params.get('token');
+let contract = null, company = {};
+
+function money(n){ return '$' + (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(iso){ if(!iso) return ''; const d=new Date(iso); return isNaN(d)?'':d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}); }
+
+async function boot(){
+  if(!token){ showState('This link is missing its agreement code. Please use the link Domo sent you.'); return; }
+  // company details (best-effort)
+  try{
+    const { data } = await sb.from('settings').select('key,value');
+    (data||[]).forEach(r=> company[r.key]=r.value);
+  }catch(e){}
+  const { data, error } = await sb.from('contracts').select('*').eq('public_token', token).maybeSingle();
+  if(error || !data){ showState('We couldn’t find this agreement. The link may be invalid or expired — please contact Domo.'); return; }
+  contract = data;
+  render();
+}
+
+function showState(msg){
+  document.getElementById('loading').style.display='none';
+  const c=document.getElementById('content'); c.style.display='block';
+  c.innerHTML = `<div class="card"><div class="state-msg">${esc(msg)}</div></div>`;
+  setFooter();
+}
+
+function setFooter(){
+  const name = company.company_name || 'Domo';
+  const bits = [name, company.company_phone, company.company_email, company.company_website].filter(Boolean).map(esc);
+  document.getElementById('foot').innerHTML = bits.join(' · ');
+}
+
+function render(){
+  document.getElementById('loading').style.display='none';
+  const el = document.getElementById('content'); el.style.display='block';
+  const c = contract;
+  const companyName = company.company_name || 'Domo';
+  const terms = {
+    guarantee: c.guarantee_terms || DEFAULT_TERMS.guarantee,
+    change_order: c.change_order_terms || DEFAULT_TERMS.change_order,
+    cancellation: c.cancellation_terms || DEFAULT_TERMS.cancellation,
+  };
+  const total = Number(c.contract_total)||0;
+  const deposit = Number(c.deposit_amount)||0;
+  const balance = Math.max(0, total - deposit);
+  const statusLabel = {draft:'Draft',sent:'Awaiting signature',signed:'Signed',void:'Voided'}[c.status]||c.status;
+
+  const signedBlock = c.status==='signed' ? `
+    <div class="card center">
+      <div class="big-check">✓</div>
+      <h2 style="margin:0 0 4px;">Agreement signed</h2>
+      <p style="color:var(--soft);margin:0;">Signed by <b>${esc(c.signer_name||'')}</b> on ${esc(fmtDate(c.signed_at))}.</p>
+      ${deposit>0 ? `<p class="note">Your deposit of <b>${money(deposit)}</b> reserves your spot. Domo will send the deposit invoice to ${esc(c.client_email||'you')}.</p>`:''}
+    </div>` : '';
+
+  const signForm = (c.status==='draft'||c.status==='sent') ? `
+    <div class="card sign-card">
+      <h2 class="sec">Sign to accept</h2>
+      <p style="font-size:14px;color:var(--soft);margin-top:0;">By signing, you agree to the scope, price, and terms above.</p>
+      <div class="field">
+        <label for="signer">Your full name</label>
+        <input type="text" id="signer" placeholder="Type your full legal name" value="${esc(c.client_name||'')}" />
+      </div>
+      <div class="field">
+        <label>Signature</label>
+        <div class="sigpad-wrap">
+          <canvas id="sigpad"></canvas>
+          <span class="sig-hint" id="sig-hint">Draw your signature here</span>
+        </div>
+        <button type="button" class="sig-clear" onclick="clearSig()">Clear signature</button>
+      </div>
+      <label class="agree"><input type="checkbox" id="agree" />
+        <span>I have read and agree to this Service Agreement${deposit>0?` and understand a deposit of <b>${money(deposit)}</b> is due to schedule the work`:''}.</span></label>
+      <button class="btn" id="sign-btn" onclick="submitSign()">Sign agreement</button>
+      <div class="note">${esc(companyName)} · secure electronic signature</div>
+    </div>` : '';
+
+  const voidBlock = c.status==='void' ? `<div class="card"><div class="state-msg">This agreement has been voided by Domo. Please contact us for an updated version.</div></div>` : '';
+
+  el.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="color:var(--soft);font-size:14px;">Prepared ${esc(fmtDate(c.created_at))}</div>
+        <span class="status-pill ${esc(c.status)}">${esc(statusLabel)}</span>
+      </div>
+
+      <h2 class="sec">Parties</h2>
+      <div class="parties">
+        <div class="party">
+          <div class="role">Service provider</div>
+          <div class="name">${esc(companyName)}</div>
+          <div class="meta">${[company.company_phone,company.company_email].filter(Boolean).map(esc).join('<br>')||'Puerto Rico'}</div>
+        </div>
+        <div class="party">
+          <div class="role">Client</div>
+          <div class="name">${esc(c.client_name||'—')}</div>
+          <div class="meta">${[c.client_property,c.client_email].filter(Boolean).map(esc).join('<br>')}</div>
+        </div>
+      </div>
+
+      <h2 class="sec">Scope of work</h2>
+      <div class="scope-box">${esc(c.scope||'See attached quote.')}</div>
+
+      <h2 class="sec">Price</h2>
+      <div class="price-grid">
+        <div class="lbl">Total</div><div class="val total">${money(total)}</div>
+        ${deposit>0?`<div class="lbl deposit">Deposit due on signing</div><div class="val deposit">${money(deposit)}${c.deposit_percent?` (${esc(c.deposit_percent)}%)`:''}</div>`:''}
+        ${deposit>0?`<div class="lbl">Balance</div><div class="val">${money(balance)}</div>`:''}
+      </div>
+      <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">Prices are in USD. Applicable IVU is included as shown on your quote. Materials outside the described scope are billed separately with receipts.</p>
+
+      <h2 class="sec">Payment schedule</h2>
+      <div class="terms"><p>${esc(c.payment_terms || (deposit>0? `A deposit of ${money(deposit)} is due on signing to schedule the work. The remaining ${money(balance)} is due on completion.` : 'Payment is due on completion.'))}</p></div>
+
+      <h2 class="sec">Changes to the work</h2>
+      <div class="terms"><p>${esc(terms.change_order)}</p></div>
+
+      <h2 class="sec">Guarantee</h2>
+      <div class="terms"><p>${esc(terms.guarantee)}</p></div>
+
+      <h2 class="sec">Cancellation</h2>
+      <div class="terms"><p>${esc(terms.cancellation)}</p></div>
+    </div>
+    ${signedBlock}${signForm}${voidBlock}`;
+
+  setFooter();
+  if(c.status==='draft'||c.status==='sent') initSigPad();
+}
+
+// ---- signature pad ----
+let sigCtx=null, drawing=false, hasInk=false;
+function initSigPad(){
+  const cv=document.getElementById('sigpad'); if(!cv) return;
+  const ratio=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  cv.width=rect.width*ratio; cv.height=rect.height*ratio;
+  sigCtx=cv.getContext('2d'); sigCtx.scale(ratio,ratio);
+  sigCtx.lineWidth=2.2; sigCtx.lineCap='round'; sigCtx.lineJoin='round'; sigCtx.strokeStyle='#142543';
+  const pos=e=>{const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};};
+  const start=e=>{drawing=true;const p=pos(e);sigCtx.beginPath();sigCtx.moveTo(p.x,p.y);e.preventDefault();};
+  const move=e=>{if(!drawing)return;const p=pos(e);sigCtx.lineTo(p.x,p.y);sigCtx.stroke();hasInk=true;document.getElementById('sig-hint').style.display='none';e.preventDefault();};
+  const end=()=>{drawing=false;};
+  cv.addEventListener('mousedown',start); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+  cv.addEventListener('touchstart',start,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',end);
+}
+function clearSig(){ const cv=document.getElementById('sigpad'); if(cv&&sigCtx){sigCtx.clearRect(0,0,cv.width,cv.height);hasInk=false;document.getElementById('sig-hint').style.display='block';} }
+
+async function submitSign(){
+  const name=(document.getElementById('signer').value||'').trim();
+  const agreed=document.getElementById('agree').checked;
+  if(!name){ alert('Please type your full name.'); return; }
+  if(!hasInk){ alert('Please draw your signature.'); return; }
+  if(!agreed){ alert('Please check the box to agree to the terms.'); return; }
+  const btn=document.getElementById('sign-btn'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Signing…';
+  let sigData=''; try{ sigData=document.getElementById('sigpad').toDataURL('image/png'); }catch(e){}
+  try{
+    const { error } = await sb.from('contracts').update({
+      status:'signed', signed_at:new Date().toISOString(), signer_name:name, signature_data:sigData
+    }).eq('public_token', token).neq('status','signed'); // don't overwrite an existing signature
+    if(error) throw error;
+    contract.status='signed'; contract.signed_at=new Date().toISOString(); contract.signer_name=name;
+    window.scrollTo({top:0,behavior:'smooth'});
+    render();
+  }catch(e){
+    btn.disabled=false; btn.innerHTML='Sign agreement';
+    alert('We couldn’t record your signature: '+e.message);
+  }
+}
+
+boot();
+</script>
+</body>
+</html>
