@@ -370,8 +370,26 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 .pf-m.ok{background:#eaf6ee;border-color:#bfe3cb;} .pf-m.ok b{color:#2d6a4f;}
 .pf-m.warn{background:#fef7e6;border-color:#f0dfb0;} .pf-m.warn b{color:#8a6d00;}
 .pf-m.bad{background:#fdecea;border-color:#f2c4be;} .pf-m.bad b{color:#b3261e;}
-.pf-add{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
-@media(max-width:560px){.pf-grid{grid-template-columns:repeat(2,1fr);}.pf-margins{grid-template-columns:1fr;}}
+.pf-add{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;}
+.pf-section{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--mid);font-weight:700;margin:18px 0 8px;}
+.pf-table{width:100%;border-collapse:collapse;font-size:14px;}
+.pf-table th,.pf-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+.pf-table th.num,.pf-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.pf-table thead th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mid);font-weight:700;}
+.pf-table tr.pf-total td{font-weight:800;border-top:2px solid var(--border);border-bottom:none;}
+.pf-var.ok{color:var(--green);} .pf-var.bad{color:var(--red);}
+.pf-proj{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.pf-col{border:1px solid var(--border);border-radius:10px;padding:12px;}
+.pf-col.accent{border-color:var(--primary);background:var(--cream);}
+.pf-col-h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);font-weight:700;margin-bottom:8px;}
+.pf-line{display:flex;justify-content:space-between;font-size:13px;margin:3px 0;}
+.pf-line span{color:var(--mid);}
+.pf-line b{font-variant-numeric:tabular-nums;}
+.pf-res{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-weight:800;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;justify-content:space-between;}
+.pf-res span{font-size:20px;} .pf-res small{font-size:13px;font-weight:700;}
+.pf-res.ok{color:var(--green);} .pf-res.warn{color:#8a6d00;} .pf-res.bad{color:var(--red);}
+.hidden{display:none;}
+@media(max-width:600px){.pf-grid{grid-template-columns:repeat(2,1fr);}.pf-margins{grid-template-columns:1fr;}.pf-proj{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -1656,20 +1674,55 @@ function phaseCost(q) {
   return tl * (1 - ml) + tm * (1 - mm) + te * (1 - me);
 }
 
+// Planned cost of a phase broken out by category (priced totals * (1 - margin)).
+function phaseCostByCat(q) {
+  const tl = +q.total_labor || 0, tm = +q.total_materials || 0, te = +q.total_equipment || 0;
+  const ml = (q.margin_labor == null ? 40 : +q.margin_labor) / 100;
+  const mm = (q.margin_materials == null ? 25 : +q.margin_materials) / 100;
+  const me = (q.margin_equipment == null ? 25 : +q.margin_equipment) / 100;
+  return { labor: tl * (1 - ml), materials: tm * (1 - mm), equipment: te * (1 - me) };
+}
+
 function projectFinancials(p) {
   const phases = p._phases || [];
   const revenue = phases.reduce((s, q) => s + (+q.grand_total || 0), 0) || (+p.budget_total || 0);
-  const plannedCost = phases.reduce((s, q) => s + phaseCost(q), 0);
-  const actualCost = (p._costs || []).reduce((s, c) => s + (+c.amount || 0), 0);
+
+  // Planned cost by category (from the quotes).
+  const planned = { labor: 0, materials: 0, equipment: 0 };
+  phases.forEach(q => { const c = phaseCostByCat(q); planned.labor += c.labor; planned.materials += c.materials; planned.equipment += c.equipment; });
+  const plannedCost = planned.labor + planned.materials + planned.equipment;
+
+  // Actual cost by category. Fold subcontractor -> labor and other -> materials
+  // so it lines up with the quote's three buckets.
+  const actual = { labor: 0, materials: 0, equipment: 0 };
+  (p._costs || []).forEach(c => {
+    const a = +c.amount || 0;
+    if (c.category === 'labor' || c.category === 'subcontractor') actual.labor += a;
+    else if (c.category === 'equipment') actual.equipment += a;
+    else actual.materials += a; // materials + other + anything else
+  });
+  const actualCost = actual.labor + actual.materials + actual.equipment;
+
+  // Earned-value projection.
   const bill = billingRollup(p._milestones);
+  const billed = bill.invoiced;                       // invoiced (incl. paid)
+  const toInvoice = Math.max(0, revenue - billed);
+  const pctBilled = revenue ? billed / revenue : 0;
+  const plannedCostRemaining = plannedCost * (1 - pctBilled); // budget still to spend
+  const projTotalCost = actualCost + plannedCostRemaining;
+
   return {
-    revenue, plannedCost, actualCost,
-    collected: bill.paid, invoiced: bill.invoiced,
+    revenue, plannedCost, actualCost, planned, actual,
+    collected: bill.paid, billed, invoiced: bill.invoiced, toInvoice, plannedCostRemaining,
     plannedProfit: revenue - plannedCost,
     plannedMargin: revenue ? (revenue - plannedCost) / revenue : 0,
-    actualProfit: revenue - actualCost,
-    actualMargin: revenue ? (revenue - actualCost) / revenue : 0,
-    costVariance: actualCost - plannedCost,
+    realizedProfit: billed - actualCost,
+    realizedMargin: billed ? (billed - actualCost) / billed : 0,
+    projRemainingProfit: toInvoice - plannedCostRemaining,
+    projRemainingMargin: toInvoice ? (toInvoice - plannedCostRemaining) / toInvoice : 0,
+    projTotalCost,
+    projTotalProfit: revenue - projTotalCost,
+    projTotalMargin: revenue ? (revenue - projTotalCost) / revenue : 0,
   };
 }
 
@@ -2042,43 +2095,64 @@ function openProfitModal(pid) {
 async function renderProfitModal() {
   const p = projectsCache.find(x => x.id === pfProjectId);
   if (!p) return;
-  const { data } = await sb.from('project_costs').select('*').eq('project_id', pfProjectId).order('incurred_on');
+  const { data } = await sb.from('project_costs').select('*').eq('project_id', pfProjectId).order('category');
   p._costs = data || [];
   const f = projectFinancials(p);
   const pct = n => Math.round(n * 100) + '%';
   const money = n => '$' + Math.round(n).toLocaleString('en-US');
   const mClass = m => m >= 0.40 ? 'ok' : (m >= 0.33 ? 'warn' : 'bad');
-  const costRows = (p._costs || []).map(c => {
+  const varCell = (planned, actual) => { const v = actual - planned; return `<span class="pf-var ${v <= 0 ? 'ok' : 'bad'}">${v > 0 ? '+' : ''}${money(v)}</span>`; };
+  const catRow = (label, planned, actual) => `<tr><td>${label}</td><td class="num">${money(planned)}</td><td class="num">${money(actual)}</td><td class="num">${varCell(planned, actual)}</td></tr>`;
+  const detailRows = (p._costs || []).map(c => {
     const cat = (COST_CATEGORIES.find(k => k[0] === c.category) || [null, c.category])[1];
-    return `<div class="bm-row">
-        <div class="bm-title">${esc(c.description || cat)} <span style="font-size:11px;color:var(--mid);">${esc(cat)}${c.vendor ? ' · ' + esc(c.vendor) : ''}${c.incurred_on ? ' · ' + esc(c.incurred_on) : ''}</span></div>
-        <div class="bm-amt">$${(+c.amount||0).toFixed(2)}</div>
-        <div class="bm-act"><button class="btn btn-danger btn-sm" onclick="deleteProjectCost('${c.id}')">✕</button></div>
-      </div>`;
+    return `<div class="bm-row"><div class="bm-title">${esc(c.vendor || c.description || cat)} <span style="font-size:11px;color:var(--mid);">${esc(cat)}${c.vendor && c.description ? ' · ' + esc(c.description) : ''}</span></div><div class="bm-amt">$${(+c.amount||0).toFixed(2)}</div><div class="bm-act"><button class="btn btn-danger btn-sm" onclick="deleteProjectCost('${c.id}')">✕</button></div></div>`;
   }).join('');
   document.getElementById('pf-body').innerHTML = `
     <div class="modal-title" style="margin-bottom:2px;">Rentabilidad · ${esc(p.project_number||'')}</div>
-    <div style="color:var(--mid);font-size:13px;margin-bottom:14px;">${esc(p.title||'')}</div>
-    <div class="pf-grid">
-      <div class="pf-cell"><span>Ingreso (cotizado)</span><b>${money(f.revenue)}</b></div>
-      <div class="pf-cell"><span>Cobrado</span><b style="color:var(--green);">${money(f.collected)}</b></div>
-      <div class="pf-cell"><span>Costo planificado</span><b>${money(f.plannedCost)}</b></div>
-      <div class="pf-cell"><span>Costo real</span><b>${money(f.actualCost)}</b></div>
+    <div style="color:var(--mid);font-size:13px;margin-bottom:16px;">${esc(p.title||'')}</div>
+
+    <div class="pf-section">Costos: cotizado vs. real</div>
+    <table class="pf-table">
+      <thead><tr><th>Categoría</th><th class="num">Cotizado</th><th class="num">Real</th><th class="num">Variación</th></tr></thead>
+      <tbody>
+        ${catRow('Mano de obra', f.planned.labor, f.actual.labor)}
+        ${catRow('Materiales', f.planned.materials, f.actual.materials)}
+        ${catRow('Equipo', f.planned.equipment, f.actual.equipment)}
+        <tr class="pf-total"><td>Total</td><td class="num">${money(f.plannedCost)}</td><td class="num">${money(f.actualCost)}</td><td class="num">${varCell(f.plannedCost, f.actualCost)}</td></tr>
+      </tbody>
+    </table>
+
+    <div class="pf-section">Proyección de margen</div>
+    <div class="pf-proj">
+      <div class="pf-col">
+        <div class="pf-col-h">Facturado</div>
+        <div class="pf-line"><span>Facturado</span><b>${money(f.billed)}</b></div>
+        <div class="pf-line"><span>Gastado</span><b>${money(f.actualCost)}</b></div>
+        <div class="pf-res ${mClass(f.realizedMargin)}"><span>${money(f.realizedProfit)}</span><small>${pct(f.realizedMargin)}</small></div>
+      </div>
+      <div class="pf-col">
+        <div class="pf-col-h">Por facturar</div>
+        <div class="pf-line"><span>Por facturar</span><b>${money(f.toInvoice)}</b></div>
+        <div class="pf-line"><span>Costo a completar</span><b>${money(f.plannedCostRemaining)}</b></div>
+        <div class="pf-res ${mClass(f.projRemainingMargin)}"><span>${money(f.projRemainingProfit)}</span><small>${pct(f.projRemainingMargin)}</small></div>
+      </div>
+      <div class="pf-col accent">
+        <div class="pf-col-h">Proyección final</div>
+        <div class="pf-line"><span>Ingreso</span><b>${money(f.revenue)}</b></div>
+        <div class="pf-line"><span>Costo total proy.</span><b>${money(f.projTotalCost)}</b></div>
+        <div class="pf-res ${mClass(f.projTotalMargin)}"><span>${money(f.projTotalProfit)}</span><small>${pct(f.projTotalMargin)}</small></div>
+      </div>
     </div>
-    <div class="pf-margins">
-      <div class="pf-m ${mClass(f.plannedMargin)}"><span>Margen planificado</span><b>${pct(f.plannedMargin)}</b><small>${money(f.plannedProfit)}</small></div>
-      <div class="pf-m ${mClass(f.actualMargin)}"><span>Margen real (a la fecha)</span><b>${pct(f.actualMargin)}</b><small>${money(f.actualProfit)}</small></div>
-      <div class="pf-m ${f.costVariance <= 0 ? 'ok' : 'bad'}"><span>Variación de costo</span><b>${f.costVariance > 0 ? '+' : ''}${money(f.costVariance)}</b><small>real vs plan</small></div>
-    </div>
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;margin:16px 0 8px;">Costos reales</div>
-    <div class="bm-table">${costRows || '<div style="color:var(--mid);font-size:13px;">Aún no hay costos registrados. Añade materiales, mano de obra o subcontratos abajo.</div>'}</div>
+
     <div class="pf-add">
       <select class="form-select" id="pf-cat" style="flex:1;min-width:0;">${COST_CATEGORIES.map(c => `<option value="${c[0]}">${c[1]}</option>`).join('')}</select>
       <input type="text" id="pf-desc" class="form-input" placeholder="Descripción" style="flex:2;min-width:0;" />
       <input type="text" id="pf-vendor" class="form-input" placeholder="Proveedor" style="flex:1;min-width:0;" />
       <input type="number" id="pf-amount" class="form-input" placeholder="$0" style="width:90px;" />
       <button class="btn btn-amber btn-sm" onclick="addProjectCost()">Añadir</button>
-    </div>`;
+    </div>
+    <div style="margin-top:8px;"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('pf-detail').classList.toggle('hidden')">Ver / ocultar detalle (${(p._costs||[]).length})</button></div>
+    <div id="pf-detail" class="hidden bm-table" style="margin-top:8px;">${detailRows || '<div style="color:var(--mid);font-size:13px;">Sin costos.</div>'}</div>`;
 }
 
 async function addProjectCost() {
