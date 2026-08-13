@@ -356,6 +356,22 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 .bm-act{display:flex;gap:6px;align-items:center;}
 .bm-add{display:flex;gap:8px;align-items:center;margin-top:6px;}
 @media(max-width:560px){.bm-rollup{grid-template-columns:repeat(2,1fr);}.bm-row{grid-template-columns:1fr auto;}}
+.pm-radio{display:block;font-size:14px;margin:6px 0;cursor:pointer;}
+.pm-radio input{margin-right:8px;accent-color:var(--primary);}
+.pf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.pf-cell{background:var(--cream);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:2px;}
+.pf-cell span{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mid);font-weight:700;}
+.pf-cell b{font-size:16px;font-variant-numeric:tabular-nums;}
+.pf-margins{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px;}
+.pf-m{border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:1px;border:1px solid var(--border);}
+.pf-m span{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--mid);font-weight:700;}
+.pf-m b{font-size:20px;font-variant-numeric:tabular-nums;}
+.pf-m small{font-size:11px;color:var(--mid);}
+.pf-m.ok{background:#eaf6ee;border-color:#bfe3cb;} .pf-m.ok b{color:#2d6a4f;}
+.pf-m.warn{background:#fef7e6;border-color:#f0dfb0;} .pf-m.warn b{color:#8a6d00;}
+.pf-m.bad{background:#fdecea;border-color:#f2c4be;} .pf-m.bad b{color:#b3261e;}
+.pf-add{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+@media(max-width:560px){.pf-grid{grid-template-columns:repeat(2,1fr);}.pf-margins{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -591,7 +607,7 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
       <div class="stat-card"><div class="stat-num" id="pstat-total">—</div><div class="stat-label">Proyectos</div></div>
       <div class="stat-card highlight"><div class="stat-num" id="pstat-budget">—</div><div class="stat-label">Presupuesto total</div></div>
       <div class="stat-card"><div class="stat-num" id="pstat-active">—</div><div class="stat-label">Activos</div></div>
-      <div class="stat-card"><div class="stat-num" id="pstat-blocked">—</div><div class="stat-label">Bloqueados</div></div>
+      <div class="stat-card"><div class="stat-num" id="pstat-receivable">—</div><div class="stat-label">Por cobrar</div></div>
     </div>
     <div class="search-bar">
       <span class="search-icon">⌕</span>
@@ -777,6 +793,48 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
       <button class="btn btn-ghost" onclick="closeModal('contract-modal')">Cancelar</button>
       <button class="btn btn-amber" onclick="generateContract()" id="cm-generate-btn">Generar contrato</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="promote-modal">
+  <div class="modal">
+    <div class="modal-title">Convertir en proyecto / fase</div>
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="pm-radio"><input type="radio" name="pm-mode" value="new" onchange="pmRefreshMode()" checked> Nuevo proyecto</label>
+      <label class="pm-radio"><input type="radio" name="pm-mode" value="existing" onchange="pmRefreshMode()"> Añadir a proyecto existente</label>
+    </div>
+    <div class="form-row" id="pm-new-row">
+      <div class="form-group"><label class="form-label">Nombre del proyecto</label><input class="form-input" id="pm-new-title" /></div>
+    </div>
+    <div class="form-row" id="pm-existing-row" style="display:none;">
+      <div class="form-group"><label class="form-label">Proyecto</label><select class="form-select" id="pm-existing-select"></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Nombre de esta fase</label><input class="form-input" id="pm-phase-name" placeholder="ej. Fase 1 — Demolición" /></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('promote-modal')">Cancelar</button>
+      <button class="btn btn-amber" onclick="confirmPromote()" id="pm-confirm-btn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="add-phase-modal">
+  <div class="modal">
+    <div class="modal-title">Añadir fase (cotización aprobada)</div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Cotización</label><select class="form-select" id="ap-select"></select></div></div>
+    <div class="form-row"><div class="form-group"><label class="form-label">Nombre de la fase</label><input class="form-input" id="ap-phase-name" placeholder="ej. Fase 2 — Impermeabilización" /></div></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('add-phase-modal')">Cancelar</button>
+      <button class="btn btn-amber" onclick="addPhaseToProject()">Añadir fase</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="profit-modal">
+  <div class="modal" style="max-width:680px;">
+    <div id="pf-body"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal('profit-modal')">Cerrar</button></div>
   </div>
 </div>
 
@@ -1409,40 +1467,131 @@ function projectGateOk(p) {
   return !!p.fondo_cleared && !!p.coi_cleared && (!p.permits_required || !!p.permits_cleared);
 }
 
-async function promoteToProject(quoteId, btn) {
+// Recompute a project's revenue cache from the sum of its linked phases (quotes).
+async function syncProjectBudget(projectId) {
+  const { data } = await sb.from('quotes').select('grand_total').eq('project_id', projectId);
+  const total = (data || []).reduce((s, q) => s + (+q.grand_total || 0), 0);
+  await sb.from('projects').update({ budget_total: total }).eq('id', projectId);
+  return total;
+}
+
+let pmQuoteId = null, pmProjects = [];
+// Entry point from an approved quote — opens the promote modal (new vs existing project).
+async function promoteToProject(quoteId) {
   const quote = quotesCache.find(x => x.id === quoteId);
   if (!quote) return;
   if (quote.project_id) { toast('Esta cotización ya tiene un proyecto.', 'error'); showPage('projects'); return; }
-  const suggested = (quote.scope ? quote.scope.slice(0, 60) : ((quote.client_name || 'Cliente') + ' — proyecto'));
-  const title = (prompt('Nombre del proyecto:', suggested) || '').trim();
-  if (!title) return;
-  const orig = btn ? btn.innerHTML : null;
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creando...'; }
+  pmQuoteId = quoteId;
+  const { data } = await sb.from('projects').select('id,project_number,title,client_name').order('created_at', { ascending: false });
+  pmProjects = data || [];
+  // Same-client projects float to the top of the dropdown.
+  const cn = (quote.client_name || '').toLowerCase();
+  pmProjects.sort((a, b) => ((b.client_name||'').toLowerCase() === cn) - ((a.client_name||'').toLowerCase() === cn));
+  const opts = pmProjects.map(p => `<option value="${p.id}">${esc(p.project_number)} · ${esc(p.title||p.client_name||'')}</option>`).join('');
+  document.getElementById('pm-existing-select').innerHTML = opts || '<option value="">(no hay proyectos)</option>';
+  document.getElementById('pm-new-title').value = (quote.scope ? quote.scope.slice(0, 50) : (quote.client_name || 'Proyecto'));
+  document.getElementById('pm-phase-name').value = 'Fase 1';
+  document.querySelector('input[name="pm-mode"][value="new"]').checked = true;
+  pmRefreshMode();
+  document.getElementById('promote-modal').classList.add('open');
+}
+
+function pmRefreshMode() {
+  const mode = document.querySelector('input[name="pm-mode"]:checked').value;
+  document.getElementById('pm-new-row').style.display = mode === 'new' ? '' : 'none';
+  document.getElementById('pm-existing-row').style.display = mode === 'existing' ? '' : 'none';
+}
+
+async function confirmPromote() {
+  const quote = quotesCache.find(x => x.id === pmQuoteId);
+  if (!quote) return;
+  const mode = document.querySelector('input[name="pm-mode"]:checked').value;
+  const phaseName = (document.getElementById('pm-phase-name').value || '').trim() || null;
+  const btn = document.getElementById('pm-confirm-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando...';
   try {
-    const { data: proj, error } = await sb.from('projects').insert({
-      title,
-      client_id:       quote.client_id || null,
-      client_name:     quote.client_name || null,
-      client_phone:    quote.client_phone || null,
-      client_email:    quote.client_email || null,
-      client_property: quote.client_property || null,
-      primary_quote_id: quote.id,
-      budget_total:    quote.grand_total || null,
-      size:            (quote.grand_total || 0) >= 15000 ? 'large' : 'small',
-      status:          'active',
-      created_by:      (currentUser && currentUser.email) || null,
-    }).select().single();
-    if (error) throw error;
-    await sb.from('quotes').update({ project_id: proj.id }).eq('id', quote.id);
-    quote.project_id = proj.id;
-    quote._projectNumber = proj.project_number;
+    let projId, projNum;
+    if (mode === 'new') {
+      const title = (document.getElementById('pm-new-title').value || '').trim();
+      if (!title) { toast('Escribe un nombre para el proyecto.', 'error'); btn.disabled = false; btn.innerHTML = 'Guardar'; return; }
+      const { data: proj, error } = await sb.from('projects').insert({
+        title, client_id: quote.client_id || null, client_name: quote.client_name || null,
+        client_phone: quote.client_phone || null, client_email: quote.client_email || null,
+        client_property: quote.client_property || null, primary_quote_id: quote.id,
+        size: (quote.grand_total || 0) >= 15000 ? 'large' : 'small', status: 'active',
+        created_by: (currentUser && currentUser.email) || null,
+      }).select().single();
+      if (error) throw error;
+      projId = proj.id; projNum = proj.project_number;
+      await sb.from('quotes').update({ project_id: projId, phase_name: phaseName, phase_order: 0 }).eq('id', quote.id);
+    } else {
+      projId = document.getElementById('pm-existing-select').value;
+      if (!projId) { toast('Elige un proyecto.', 'error'); btn.disabled = false; btn.innerHTML = 'Guardar'; return; }
+      const { count } = await sb.from('quotes').select('id', { count: 'exact', head: true }).eq('project_id', projId);
+      await sb.from('quotes').update({ project_id: projId, phase_name: phaseName, phase_order: count || 0 }).eq('id', quote.id);
+      const pr = pmProjects.find(x => x.id === projId); projNum = pr ? pr.project_number : 'proyecto';
+    }
+    await syncProjectBudget(projId);
+    quote.project_id = projId; quote._projectNumber = projNum;
+    closeModal('promote-modal');
     renderQuotesList();
-    toast(`${proj.project_number} creado desde ${quote.quote_number || 'la cotización'}.`, 'success');
+    toast(`${quote.quote_number || 'Cotización'} añadida a ${projNum}.`, 'success');
     showPage('projects');
   } catch (e) {
-    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
-    toast('No se pudo crear el proyecto: ' + e.message, 'error');
+    btn.disabled = false; btn.innerHTML = 'Guardar';
+    toast('No se pudo guardar: ' + e.message, 'error');
   }
+}
+
+// Add an existing approved quote (not yet linked) as a new phase of a project.
+let apProjectId = null;
+async function openAddPhaseModal(projectId) {
+  apProjectId = projectId;
+  const { data } = await sb.from('quotes').select('id,quote_number,scope,grand_total,client_name')
+    .is('project_id', null).eq('status', 'approved').order('created_at', { ascending: false });
+  const opts = (data || []).map(q => `<option value="${q.id}">${esc(q.quote_number)} · $${(+q.grand_total||0).toFixed(0)} · ${esc((q.scope||'').slice(0,40))}</option>`).join('');
+  document.getElementById('ap-select').innerHTML = opts || '<option value="">(no hay cotizaciones aprobadas sin proyecto)</option>';
+  document.getElementById('ap-phase-name').value = '';
+  document.getElementById('add-phase-modal').classList.add('open');
+}
+
+async function addPhaseToProject() {
+  const qid = document.getElementById('ap-select').value;
+  if (!qid) { toast('Elige una cotización.', 'error'); return; }
+  const phaseName = (document.getElementById('ap-phase-name').value || '').trim() || null;
+  const { count } = await sb.from('quotes').select('id', { count: 'exact', head: true }).eq('project_id', apProjectId);
+  await sb.from('quotes').update({ project_id: apProjectId, phase_name: phaseName, phase_order: count || 0 }).eq('id', qid);
+  await syncProjectBudget(apProjectId);
+  closeModal('add-phase-modal');
+  toast('Fase añadida.', 'success');
+  loadAndRenderProjects();
+}
+
+async function movePhasePrompt(quoteId) {
+  const { data } = await sb.from('projects').select('id,project_number,title').order('created_at', { ascending: false });
+  const list = (data || []).map((p, i) => `${i+1}) ${p.project_number} — ${p.title || ''}`).join('\n');
+  const pick = (prompt('Mover esta fase a qué proyecto? Escribe el número:\n' + list, '') || '').trim();
+  const idx = parseInt(pick) - 1;
+  if (isNaN(idx) || !data || !data[idx]) return;
+  const dest = data[idx].id;
+  const q = quotesCache.find(x => x.id === quoteId);
+  const oldProj = q ? q.project_id : null;
+  const { count } = await sb.from('quotes').select('id', { count: 'exact', head: true }).eq('project_id', dest);
+  await sb.from('quotes').update({ project_id: dest, phase_order: count || 0 }).eq('id', quoteId);
+  await syncProjectBudget(dest);
+  if (oldProj) await syncProjectBudget(oldProj);
+  toast(`Fase movida a ${data[idx].project_number}.`, 'success');
+  loadAndRenderProjects();
+}
+
+async function unlinkPhase(quoteId) {
+  if (!confirm('¿Quitar esta cotización del proyecto? La cotización no se borra.')) return;
+  const q = quotesCache.find(x => x.id === quoteId);
+  const proj = q ? q.project_id : null;
+  await sb.from('quotes').update({ project_id: null, phase_name: null, phase_order: null }).eq('id', quoteId);
+  if (proj) await syncProjectBudget(proj);
+  toast('Fase quitada del proyecto.', 'success');
+  loadAndRenderProjects();
 }
 
 async function loadAndRenderProjects() {
@@ -1468,8 +1617,60 @@ async function loadAndRenderProjects() {
       projectsCache.forEach(p => { p._milestones = byP[p.id] || []; });
     }
   } catch (e) { /* milestones optional — never block the list */ }
+  // Attach phases (linked quotes) per project — a project is many quotes/phases.
+  try {
+    const ids = projectsCache.map(p => p.id);
+    if (ids.length) {
+      const { data: ph } = await sb.from('quotes')
+        .select('id,quote_number,scope,grand_total,total_labor,total_materials,total_equipment,margin_labor,margin_materials,margin_equipment,phase_name,phase_order,created_at,project_id')
+        .in('project_id', ids);
+      const byP = {};
+      (ph || []).forEach(q => { (byP[q.project_id] = byP[q.project_id] || []).push(q); });
+      Object.values(byP).forEach(arr => arr.sort((a, b) =>
+        ((a.phase_order == null ? 999 : a.phase_order) - (b.phase_order == null ? 999 : b.phase_order))
+        || (new Date(a.created_at) - new Date(b.created_at))));
+      projectsCache.forEach(p => { p._phases = byP[p.id] || []; });
+    }
+  } catch (e) { /* phases optional */ }
+  // Attach actual costs per project (Step 5 profitability).
+  try {
+    const ids = projectsCache.map(p => p.id);
+    if (ids.length) {
+      const { data: cs } = await sb.from('project_costs').select('*').in('project_id', ids).order('incurred_on', { ascending: true });
+      const byP = {};
+      (cs || []).forEach(c => { (byP[c.project_id] = byP[c.project_id] || []).push(c); });
+      projectsCache.forEach(p => { p._costs = byP[p.id] || []; });
+    }
+  } catch (e) { /* costs optional */ }
   renderProjectStats();
   renderProjectsList();
+}
+
+// Planned cost of a phase (quote): stored category totals are PRICED, so the
+// cost basis = priced * (1 - margin) per category.
+function phaseCost(q) {
+  const tl = +q.total_labor || 0, tm = +q.total_materials || 0, te = +q.total_equipment || 0;
+  const ml = (q.margin_labor == null ? 40 : +q.margin_labor) / 100;
+  const mm = (q.margin_materials == null ? 25 : +q.margin_materials) / 100;
+  const me = (q.margin_equipment == null ? 25 : +q.margin_equipment) / 100;
+  return tl * (1 - ml) + tm * (1 - mm) + te * (1 - me);
+}
+
+function projectFinancials(p) {
+  const phases = p._phases || [];
+  const revenue = phases.reduce((s, q) => s + (+q.grand_total || 0), 0) || (+p.budget_total || 0);
+  const plannedCost = phases.reduce((s, q) => s + phaseCost(q), 0);
+  const actualCost = (p._costs || []).reduce((s, c) => s + (+c.amount || 0), 0);
+  const bill = billingRollup(p._milestones);
+  return {
+    revenue, plannedCost, actualCost,
+    collected: bill.paid, invoiced: bill.invoiced,
+    plannedProfit: revenue - plannedCost,
+    plannedMargin: revenue ? (revenue - plannedCost) / revenue : 0,
+    actualProfit: revenue - actualCost,
+    actualMargin: revenue ? (revenue - actualCost) / revenue : 0,
+    costVariance: actualCost - plannedCost,
+  };
 }
 
 function billingRollup(ms) {
@@ -1481,11 +1682,13 @@ function billingRollup(ms) {
 }
 
 function renderProjectStats() {
-  const budget = projectsCache.reduce((s, p) => s + (p.budget_total || 0), 0);
+  let revenue = 0, receivable = 0;
+  projectsCache.forEach(p => { const f = projectFinancials(p); revenue += f.revenue; receivable += Math.max(0, f.revenue - f.collected); });
+  const k = n => '$' + (n >= 1000 ? (n/1000).toFixed(1)+'k' : n.toFixed(0));
   document.getElementById('pstat-total').textContent = projectsCache.length;
-  document.getElementById('pstat-budget').textContent = '$' + (budget >= 1000 ? (budget/1000).toFixed(1)+'k' : budget.toFixed(0));
+  document.getElementById('pstat-budget').textContent = k(revenue);
   document.getElementById('pstat-active').textContent = projectsCache.filter(p => p.status === 'active').length;
-  document.getElementById('pstat-blocked').textContent = projectsCache.filter(p => p.status === 'active' && !projectGateOk(p)).length;
+  document.getElementById('pstat-receivable').textContent = k(receivable);
   document.getElementById('projects-count').textContent = `${projectsCache.length} proyecto(s)`;
 }
 
@@ -1518,35 +1721,56 @@ function projectStatusSelect(p) {
 function projectCard(p) {
   const el = document.createElement('div');
   el.className = 'q-card';
-  const gate = projectGateOk(p);
-  const gateBadge = gate
-    ? '<span class="proj-gate ok">✅ Listo para empezar</span>'
-    : '<span class="proj-gate block">🔒 Bloqueado</span>';
+  const fin = projectFinancials(p);
+  const phases = p._phases || [];
+  const revenue = fin.revenue;
+  const marginChip = revenue ? `<span class="proj-chip" title="Margen planificado">${Math.round(fin.plannedMargin*100)}% margen</span>` : '';
+
+  const phaseRows = phases.map((q, i) => `
+      <div class="bm-row">
+        <div class="bm-title">${esc(q.phase_name || ('Fase ' + (i+1)))}
+          <span style="font-size:11px;color:var(--mid);">${esc(q.quote_number||'')} · ${esc((q.scope||'').slice(0,40))}</span></div>
+        <div class="bm-amt">$${(+q.grand_total||0).toFixed(0)}</div>
+        <div class="bm-act">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openProjectQuote('${q.id}')">Abrir</button>
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();movePhasePrompt('${q.id}')">Mover</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();unlinkPhase('${q.id}')" title="Quitar del proyecto">✕</button>
+        </div>
+      </div>`).join('');
+
   el.innerHTML = `
     <div class="q-main">
       <div class="q-info">
         <div class="q-client">${esc(p.client_name||'—')} <span class="q-num">${esc(p.project_number||'')}</span></div>
-        <div class="q-scope">${esc(p.title||'Sin título')}</div>
+        <div class="q-scope">${esc(p.title||'Sin título')} · ${phases.length} fase(s)</div>
       </div>
       <div class="q-meta">
-        ${gateBadge}
-        ${p.budget_total ? `<span class="q-price">$${(p.budget_total||0).toFixed(0)}</span>` : ''}
+        ${marginChip}
+        ${revenue ? `<span class="q-price">$${revenue.toFixed(0)}</span>` : ''}
         <button class="q-expand-btn" onclick="toggleQExpand(this)" title="Más opciones">⋯</button>
       </div>
     </div>
     <div class="q-detail">
-      <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;">
+      <div class="q-detail-controls" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;">Fases (cotizaciones)</span>
+        <div class="bm-table">${phaseRows || '<div style="color:var(--mid);font-size:13px;">Sin fases todavía.</div>'}</div>
+        <div><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openAddPhaseModal('${p.id}')">+ Añadir fase</button></div>
+      </div>
+      <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
         ${projectStatusSelect(p)}
         <select class="form-select" style="width:110px;font-size:12px;padding:5px 8px;" onchange="updateProjectField('${p.id}','size',this.value)" onclick="event.stopPropagation()" title="Tamaño del proyecto">
           <option value="small" ${p.size==='small'?'selected':''}>Pequeño</option>
           <option value="large" ${p.size==='large'?'selected':''}>Grande</option>
         </select>
+        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();openProfitModal('${p.id}')">📊 Rentabilidad</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteProject('${p.id}')">Eliminar proyecto</button>
+      </div>
+      <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;">Cumplimiento <span style="text-transform:none;font-weight:400;">(opcional)</span></span>
         <label class="proj-flag"><input type="checkbox" ${p.fondo_cleared?'checked':''} onchange="toggleProjectFlag('${p.id}','fondo_cleared',this.checked)"> Fondo (CFSE)</label>
         <label class="proj-flag"><input type="checkbox" ${p.coi_cleared?'checked':''} onchange="toggleProjectFlag('${p.id}','coi_cleared',this.checked)"> Seguro (COI)</label>
         <label class="proj-flag"><input type="checkbox" ${p.permits_required?'checked':''} onchange="toggleProjectFlag('${p.id}','permits_required',this.checked)"> Requiere permisos</label>
         ${p.permits_required ? `<label class="proj-flag"><input type="checkbox" ${p.permits_cleared?'checked':''} onchange="toggleProjectFlag('${p.id}','permits_cleared',this.checked)"> Permisos listos</label>` : ''}
-        ${p.primary_quote_id ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openProjectQuote('${p.primary_quote_id}')">Ver cotización</button>` : ''}
-        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteProject('${p.id}')">Eliminar</button>
       </div>
       <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
         <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;">Contrato</span>
@@ -1802,6 +2026,75 @@ async function generateMilestonesFromContract(pid) {
   rows.push({ project_id: pid, title: 'Balance final', amount: bal > 0 ? bal : total, sort_order: 1, status: 'pending' });
   await sb.from('project_milestones').insert(rows);
   await renderBillingModal();
+  loadAndRenderProjects();
+}
+
+// ---- Profitability (Step 5) — planned (from quotes) vs actual (logged costs) ----
+let pfProjectId = null;
+const COST_CATEGORIES = [['labor','Mano de obra'],['materials','Materiales'],['subcontractor','Subcontrato'],['equipment','Equipo'],['other','Otro']];
+
+function openProfitModal(pid) {
+  pfProjectId = pid;
+  document.getElementById('profit-modal').classList.add('open');
+  renderProfitModal();
+}
+
+async function renderProfitModal() {
+  const p = projectsCache.find(x => x.id === pfProjectId);
+  if (!p) return;
+  const { data } = await sb.from('project_costs').select('*').eq('project_id', pfProjectId).order('incurred_on');
+  p._costs = data || [];
+  const f = projectFinancials(p);
+  const pct = n => Math.round(n * 100) + '%';
+  const money = n => '$' + Math.round(n).toLocaleString('en-US');
+  const mClass = m => m >= 0.40 ? 'ok' : (m >= 0.33 ? 'warn' : 'bad');
+  const costRows = (p._costs || []).map(c => {
+    const cat = (COST_CATEGORIES.find(k => k[0] === c.category) || [null, c.category])[1];
+    return `<div class="bm-row">
+        <div class="bm-title">${esc(c.description || cat)} <span style="font-size:11px;color:var(--mid);">${esc(cat)}${c.vendor ? ' · ' + esc(c.vendor) : ''}${c.incurred_on ? ' · ' + esc(c.incurred_on) : ''}</span></div>
+        <div class="bm-amt">$${(+c.amount||0).toFixed(2)}</div>
+        <div class="bm-act"><button class="btn btn-danger btn-sm" onclick="deleteProjectCost('${c.id}')">✕</button></div>
+      </div>`;
+  }).join('');
+  document.getElementById('pf-body').innerHTML = `
+    <div class="modal-title" style="margin-bottom:2px;">Rentabilidad · ${esc(p.project_number||'')}</div>
+    <div style="color:var(--mid);font-size:13px;margin-bottom:14px;">${esc(p.title||'')}</div>
+    <div class="pf-grid">
+      <div class="pf-cell"><span>Ingreso (cotizado)</span><b>${money(f.revenue)}</b></div>
+      <div class="pf-cell"><span>Cobrado</span><b style="color:var(--green);">${money(f.collected)}</b></div>
+      <div class="pf-cell"><span>Costo planificado</span><b>${money(f.plannedCost)}</b></div>
+      <div class="pf-cell"><span>Costo real</span><b>${money(f.actualCost)}</b></div>
+    </div>
+    <div class="pf-margins">
+      <div class="pf-m ${mClass(f.plannedMargin)}"><span>Margen planificado</span><b>${pct(f.plannedMargin)}</b><small>${money(f.plannedProfit)}</small></div>
+      <div class="pf-m ${mClass(f.actualMargin)}"><span>Margen real (a la fecha)</span><b>${pct(f.actualMargin)}</b><small>${money(f.actualProfit)}</small></div>
+      <div class="pf-m ${f.costVariance <= 0 ? 'ok' : 'bad'}"><span>Variación de costo</span><b>${f.costVariance > 0 ? '+' : ''}${money(f.costVariance)}</b><small>real vs plan</small></div>
+    </div>
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mid);font-weight:700;margin:16px 0 8px;">Costos reales</div>
+    <div class="bm-table">${costRows || '<div style="color:var(--mid);font-size:13px;">Aún no hay costos registrados. Añade materiales, mano de obra o subcontratos abajo.</div>'}</div>
+    <div class="pf-add">
+      <select class="form-select" id="pf-cat" style="flex:1;min-width:0;">${COST_CATEGORIES.map(c => `<option value="${c[0]}">${c[1]}</option>`).join('')}</select>
+      <input type="text" id="pf-desc" class="form-input" placeholder="Descripción" style="flex:2;min-width:0;" />
+      <input type="text" id="pf-vendor" class="form-input" placeholder="Proveedor" style="flex:1;min-width:0;" />
+      <input type="number" id="pf-amount" class="form-input" placeholder="$0" style="width:90px;" />
+      <button class="btn btn-amber btn-sm" onclick="addProjectCost()">Añadir</button>
+    </div>`;
+}
+
+async function addProjectCost() {
+  const category = document.getElementById('pf-cat').value;
+  const description = (document.getElementById('pf-desc').value || '').trim();
+  const vendor = (document.getElementById('pf-vendor').value || '').trim();
+  const amount = parseFloat(document.getElementById('pf-amount').value) || 0;
+  if (!amount) { toast('Escribe un monto.', 'error'); return; }
+  await sb.from('project_costs').insert({ project_id: pfProjectId, category, description: description || null, vendor: vendor || null, amount });
+  await renderProfitModal();
+  loadAndRenderProjects();
+}
+
+async function deleteProjectCost(id) {
+  await sb.from('project_costs').delete().eq('id', id);
+  await renderProfitModal();
   loadAndRenderProjects();
 }
 

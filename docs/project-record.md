@@ -113,8 +113,28 @@ to token-scoped policies is a planned hardening pass across the quote app.
       billing modal with roll-up (total / invoiced / collected / remaining),
       per-milestone pending→invoiced→paid with the BK invoice # captured,
       "generate from contract" seed. Roll-up verified against the DB.
-- [ ] Step 4: compliance package assembly (Fondo/CFSE + COI + permits in one place).
-- [ ] Step 5: per-project profitability (budget vs actual).
+- [x] Multi-phase projects — a project holds many quotes as ordered **phases**
+      (`quotes.phase_name` / `phase_order`). Promote flow now offers **new vs.
+      existing project**; phases can be added, moved, or unlinked; project
+      revenue rolls up from all phases. Compliance softened to optional tracking
+      (no hard gate, no blocked counter — per Nestor).
+- [x] Step 5: per-project **profitability** — `project_costs` (actual costs by
+      category) vs planned cost derived from the quotes (`Σ priced×(1−margin)`).
+      Rentabilidad modal shows revenue / collected / planned vs actual cost and
+      margin with ✅≥40 / ⚠️33–40 / ❌<33 banding. Verified against the DB.
+- [ ] Step 4: compliance package assembly (Fondo/CFSE + COI + permits + docs) —
+      deferred; Nestor not ready for a hard compliance gate yet.
+
+## Multi-phase + profitability
+
+**Phases:** a project is now many quotes. Each linked quote is a phase
+(`phase_name`, `phase_order`); revenue = Σ phase `grand_total`, cached on
+`projects.budget_total` via `syncProjectBudget()` whenever phases change.
+
+**Profitability (Step 5):** planned cost comes from each phase's quote — stored
+category totals are *priced*, so cost basis = `Σ total_cat × (1 − margin_cat)`.
+Actual cost is logged in `project_costs`. The modal compares planned vs actual
+margin (banded 40 / 33) and shows the cost variance.
 
 ## Progress invoicing (Step 3)
 
