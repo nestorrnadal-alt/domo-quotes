@@ -313,8 +313,11 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
   .form-row.cols-2, .form-row.cols-3 { grid-template-columns: 1fr; }
   .search-bar { flex-wrap: wrap; }
 
-  /* New Quote: stack the Estimate panel under the form (no sticky) */
-  #page-new-quote > .flex.align-start { flex-direction: column; }
+  /* New Quote: stack the Estimate panel under the form (no sticky). Force the
+     stacked columns to fill width — otherwise align-items:flex-start makes the
+     form column shrink-wrap to the line-items table and overflow the screen. */
+  #page-new-quote > .flex.align-start { flex-direction: column; align-items: stretch; }
+  #page-new-quote .flex-1 { width: 100%; min-width: 0; }
   .totals-panel { position: static !important; top: auto !important; width: 100%; min-width: 0; margin-top: 16px; }
 
   /* Work-queue rows: client+scope on top, price/gauge/action wrap below */
@@ -2126,7 +2129,7 @@ async function renderProfitModal() {
     </div>
 
     <div class="pf-section">Costos: cotizado vs. real</div>
-    <table class="pf-table">
+    <div style="overflow-x:auto;"><table class="pf-table">
       <thead><tr><th>Categoría</th><th class="num">Cotizado</th><th class="num">Real</th><th class="num">Variación</th></tr></thead>
       <tbody>
         ${catRow('Mano de obra', f.planned.labor, f.actual.labor)}
@@ -2134,7 +2137,7 @@ async function renderProfitModal() {
         ${catRow('Equipo', f.planned.equipment, f.actual.equipment)}
         <tr class="pf-total"><td>Total</td><td class="num">${money(f.plannedCost)}</td><td class="num">${money(f.actualCost)}</td><td class="num">${varCell(f.plannedCost, f.actualCost)}</td></tr>
       </tbody>
-    </table>
+    </table></div>
 
     <div class="pf-section">Proyección de margen</div>
     <div class="pf-proj">
