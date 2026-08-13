@@ -54,9 +54,27 @@ Enabled with a permissive `allow all` policy, matching the existing quote-app
 model (anon key, browser-side queries). Tightening RLS across the quote app is a
 separate, app-wide task.
 
+## App wiring (Step 1b)
+
+Added to the quote tool (`index.html`), all additive — the existing quote flow
+is untouched:
+
+- **Proyectos** nav item + page (mirrors the Cotizaciones layout: stats, search,
+  status filter, card list).
+- **Convertir en proyecto** action on an *approved* quote — creates the
+  `PROJ-###`, copies client + `grand_total` → `budget_total`, sets
+  `quotes.project_id`, and defaults `size` to `large` at ≥ $15k. A quote already
+  promoted shows a `PROJ-###` chip instead.
+- **Project card** with inline editing: status, size, and the compliance gate
+  (Fondo/CFSE, Seguro/COI, permisos). A **🔒 Bloqueado / ✅ Listo para empezar**
+  badge reflects the gate — a project isn't "ready to start" until Fondo + COI
+  (+ permits, if required) clear. "Ver cotización" opens the source quote;
+  "Eliminar" removes the project and unlinks (never deletes) the quote.
+
 ## Status
 
 - [x] Schema applied to the live `domo-quotes` Supabase project and verified
       (numbering, quote link, compliance defaults).
-- [ ] App wiring — "Promote quote to project" action + a project list/detail view.
+- [x] App wiring — "Convertir en proyecto" action + Proyectos list with the
+      compliance gate. Syntax + headless load verified.
 - [ ] Step 2: contract + deposit-on-signature (auto-generated from the quote).

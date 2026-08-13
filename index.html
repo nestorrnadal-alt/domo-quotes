@@ -338,6 +338,13 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
    Placed last so it wins over the per-element font-family on these selectors. */
 .page-title, .totals-title, .section-title, .stat-num, .login-title, .logo-sub,
 .queue-title, .totals-row.total, .q-price, .q-client, .lm-pill, .modal-title { font-family: var(--display); }
+/* --- Projects (Step 1b) --- */
+.proj-gate{font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;}
+.proj-gate.ok{color:#1a7f37;background:#e6f4ea;}
+.proj-gate.block{color:#b3261e;background:#fce8e6;}
+.proj-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:999px;color:#3652A5;background:#e6ebfa;white-space:nowrap;}
+.proj-flag{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--mid);white-space:nowrap;cursor:pointer;}
+.proj-flag input{accent-color:#3652A5;cursor:pointer;width:14px;height:14px;}
 </style>
 </head>
 <body>
@@ -375,6 +382,7 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
   <div class="nav">
     <div class="nav-item active" data-page="new-quote"><span class="nav-icon">✦</span><span>Nueva cotización</span></div>
     <div class="nav-item" data-page="quotes"><span class="nav-icon">◈</span><span>Cotizaciones</span></div>
+    <div class="nav-item" data-page="projects"><span class="nav-icon">▤</span><span>Proyectos</span></div>
     <div class="nav-divider"></div>
     <div class="nav-item" data-page="clients"><span class="nav-icon">◎</span><span>Clientes</span></div>
     <div class="nav-item" data-page="catalog"><span class="nav-icon">⊞</span><span>Catálogo</span></div>
@@ -560,6 +568,36 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
       </select>
     </div>
     <div class="quote-list" id="quotes-list"></div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div class="page" id="page-projects">
+    <div class="page-header">
+      <div><div class="page-title">Proyectos</div><div class="page-sub" id="projects-count">Cargando...</div></div>
+      <button class="btn btn-amber" onclick="showPage('quotes')">Ver cotizaciones</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num" id="pstat-total">—</div><div class="stat-label">Proyectos</div></div>
+      <div class="stat-card highlight"><div class="stat-num" id="pstat-budget">—</div><div class="stat-label">Presupuesto total</div></div>
+      <div class="stat-card"><div class="stat-num" id="pstat-active">—</div><div class="stat-label">Activos</div></div>
+      <div class="stat-card"><div class="stat-num" id="pstat-blocked">—</div><div class="stat-label">Bloqueados</div></div>
+    </div>
+    <div class="search-bar">
+      <span class="search-icon">⌕</span>
+      <input type="text" placeholder="Buscar por cliente, título, PROJ-#..." id="projects-search" oninput="renderProjectsList()" />
+      <select class="form-select" id="projects-filter" style="border:none;width:180px;font-size:13px;" onchange="renderProjectsList()">
+        <option value="" selected>Todos</option>
+        <option value="draft">Borrador</option>
+        <option value="quoting">Cotizando</option>
+        <option value="contract_sent">Contrato enviado</option>
+        <option value="active">Activo</option>
+        <option value="on_hold">En pausa</option>
+        <option value="closeout">Cierre</option>
+        <option value="complete">Completado</option>
+        <option value="cancelled">Cancelado</option>
+      </select>
+    </div>
+    <div class="quote-list" id="projects-list"></div>
   </div>
 
   <!-- CLIENTS -->
@@ -802,6 +840,7 @@ function showPage(page) {
   document.getElementById('page-' + page).classList.add('active');
   document.querySelector(`[data-page="${page}"]`).classList.add('active');
   if (page === 'quotes') loadAndRenderQuotes();
+  if (page === 'projects') loadAndRenderProjects();
   if (page === 'clients') renderClientsList();
   if (page === 'catalog') renderCatalog();
   if (page === 'settings') renderSettings();
@@ -1007,6 +1046,14 @@ async function loadAndRenderQuotes() {
     (ph || []).forEach(r => { counts[r.quote_id] = (counts[r.quote_id] || 0) + 1; });
     quotesCache.forEach(q => { q._photoCount = counts[q.id] || 0; });
   } catch (e) { /* photos are optional — never block the list */ }
+  // Tag quotes already promoted to a project, so the card can show the PROJ-### chip.
+  try {
+    if (quotesCache.some(q => q.project_id)) {
+      const { data: projs } = await sb.from('projects').select('id,project_number');
+      const map = {}; (projs || []).forEach(p => { map[p.id] = p.project_number; });
+      quotesCache.forEach(q => { if (q.project_id) q._projectNumber = map[q.project_id] || 'Proyecto'; });
+    }
+  } catch (e) { /* project tagging is optional */ }
   renderQuotesList();
   renderStats();
 }
@@ -1123,7 +1170,20 @@ function quoteDetailHtml(quote) {
       <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();updateQuoteStatus('${quote.id}','rejected')">✗ Rechazada</button>
     </div>`;
   }
-  return `${resp}<div class="q-detail-controls">
+  // Approved quotes can be promoted to a project (the spine). Purely additive —
+  // the quote itself is unchanged; a project row is created and linked.
+  let proj = '';
+  if (quote.status === 'approved') {
+    proj = quote.project_id
+      ? `<div class="q-resp" style="align-items:center;">
+           <span class="proj-chip">▤ ${esc(quote._projectNumber||'Proyecto')}</span>
+           <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();showPage('projects')">Ver en Proyectos ↗</button>
+         </div>`
+      : `<div class="q-resp">
+           <button class="btn btn-amber btn-sm" onclick="event.stopPropagation();promoteToProject('${quote.id}', this)">▤ Convertir en proyecto →</button>
+         </div>`;
+  }
+  return `${resp}${proj}<div class="q-detail-controls">
       ${statusSelectHtml(quote)}
       ${lifecycleSelectHtml(quote)}
       <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();loadQuoteForEditing('${quote.id}')">✎ Editar</button>
@@ -1150,6 +1210,7 @@ function quoteCard(quote) {
         ${cd ? `<span class="countdown ${cd.cls}" id="cd-${quote.id}">${cd.text}</span>` : ''}
         ${quote._photoCount ? `<span class="q-photo-badge" title="${quote._photoCount} foto(s)">📷 ${quote._photoCount}</span>` : ''}
         ${quote.grand_total ? `<span class="q-price">$${(quote.grand_total||0).toFixed(0)}</span>` : ''}
+        ${quote.project_id ? `<span class="proj-chip" title="Convertida en proyecto">▤ ${esc(quote._projectNumber||'Proy')}</span>` : ''}
         ${gauge}
         ${primaryActionHtml(quote)}
         <button class="q-expand-btn" onclick="toggleQExpand(this)" title="Más opciones">⋯</button>
@@ -1287,6 +1348,168 @@ async function deleteQuote(id) {
   renderStats();
   renderQuotesList();
   toast('Quote deleted.', 'success');
+}
+
+// ============================================================
+// PROJECTS (Step 1b) — the spine that a quote is promoted into.
+// Additive: standalone quotes are unaffected; a project only exists once a
+// quote is explicitly "Convertida en proyecto".
+// ============================================================
+let projectsCache = [];
+
+const PROJ_STATUSES = [
+  ['draft','Borrador'], ['quoting','Cotizando'], ['contract_sent','Contrato enviado'],
+  ['active','Activo'], ['on_hold','En pausa'], ['closeout','Cierre'],
+  ['complete','Completado'], ['cancelled','Cancelado'],
+];
+
+// A project may start only when its compliance gate is clear.
+function projectGateOk(p) {
+  return !!p.fondo_cleared && !!p.coi_cleared && (!p.permits_required || !!p.permits_cleared);
+}
+
+async function promoteToProject(quoteId, btn) {
+  const quote = quotesCache.find(x => x.id === quoteId);
+  if (!quote) return;
+  if (quote.project_id) { toast('Esta cotización ya tiene un proyecto.', 'error'); showPage('projects'); return; }
+  const suggested = (quote.scope ? quote.scope.slice(0, 60) : ((quote.client_name || 'Cliente') + ' — proyecto'));
+  const title = (prompt('Nombre del proyecto:', suggested) || '').trim();
+  if (!title) return;
+  const orig = btn ? btn.innerHTML : null;
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creando...'; }
+  try {
+    const { data: proj, error } = await sb.from('projects').insert({
+      title,
+      client_id:       quote.client_id || null,
+      client_name:     quote.client_name || null,
+      client_phone:    quote.client_phone || null,
+      client_email:    quote.client_email || null,
+      client_property: quote.client_property || null,
+      primary_quote_id: quote.id,
+      budget_total:    quote.grand_total || null,
+      size:            (quote.grand_total || 0) >= 15000 ? 'large' : 'small',
+      status:          'active',
+      created_by:      (currentUser && currentUser.email) || null,
+    }).select().single();
+    if (error) throw error;
+    await sb.from('quotes').update({ project_id: proj.id }).eq('id', quote.id);
+    quote.project_id = proj.id;
+    quote._projectNumber = proj.project_number;
+    renderQuotesList();
+    toast(`${proj.project_number} creado desde ${quote.quote_number || 'la cotización'}.`, 'success');
+    showPage('projects');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    toast('No se pudo crear el proyecto: ' + e.message, 'error');
+  }
+}
+
+async function loadAndRenderProjects() {
+  const { data } = await sb.from('projects').select('*').order('created_at', { ascending: false });
+  projectsCache = data || [];
+  renderProjectStats();
+  renderProjectsList();
+}
+
+function renderProjectStats() {
+  const budget = projectsCache.reduce((s, p) => s + (p.budget_total || 0), 0);
+  document.getElementById('pstat-total').textContent = projectsCache.length;
+  document.getElementById('pstat-budget').textContent = '$' + (budget >= 1000 ? (budget/1000).toFixed(1)+'k' : budget.toFixed(0));
+  document.getElementById('pstat-active').textContent = projectsCache.filter(p => p.status === 'active').length;
+  document.getElementById('pstat-blocked').textContent = projectsCache.filter(p => p.status === 'active' && !projectGateOk(p)).length;
+  document.getElementById('projects-count').textContent = `${projectsCache.length} proyecto(s)`;
+}
+
+function renderProjectsList() {
+  const q = (document.getElementById('projects-search')?.value || '').toLowerCase();
+  const filter = document.getElementById('projects-filter')?.value || '';
+  const list = document.getElementById('projects-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const items = projectsCache.filter(p =>
+    (!filter || p.status === filter) &&
+    (!q || (p.client_name||'').toLowerCase().includes(q)
+        || (p.title||'').toLowerCase().includes(q)
+        || (p.project_number||'').toLowerCase().includes(q)));
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state"><div class="emoji">▤</div><p>No hay proyectos todavía. Aprueba una cotización y dale <b>Convertir en proyecto</b>.</p></div>';
+    return;
+  }
+  const wrap = document.createElement('div'); wrap.className = 'queue-group';
+  items.forEach(p => wrap.appendChild(projectCard(p)));
+  list.appendChild(wrap);
+}
+
+function projectStatusSelect(p) {
+  return `<select class="form-select" style="width:150px;font-size:12px;padding:5px 8px;" onchange="updateProjectField('${p.id}','status',this.value)" onclick="event.stopPropagation()">
+      ${PROJ_STATUSES.map(([v,l]) => `<option value="${v}" ${p.status===v?'selected':''}>${l}</option>`).join('')}
+    </select>`;
+}
+
+function projectCard(p) {
+  const el = document.createElement('div');
+  el.className = 'q-card';
+  const gate = projectGateOk(p);
+  const gateBadge = gate
+    ? '<span class="proj-gate ok">✅ Listo para empezar</span>'
+    : '<span class="proj-gate block">🔒 Bloqueado</span>';
+  el.innerHTML = `
+    <div class="q-main">
+      <div class="q-info">
+        <div class="q-client">${esc(p.client_name||'—')} <span class="q-num">${esc(p.project_number||'')}</span></div>
+        <div class="q-scope">${esc(p.title||'Sin título')}</div>
+      </div>
+      <div class="q-meta">
+        ${gateBadge}
+        ${p.budget_total ? `<span class="q-price">$${(p.budget_total||0).toFixed(0)}</span>` : ''}
+        <button class="q-expand-btn" onclick="toggleQExpand(this)" title="Más opciones">⋯</button>
+      </div>
+    </div>
+    <div class="q-detail">
+      <div class="q-detail-controls" style="flex-wrap:wrap;gap:10px;align-items:center;">
+        ${projectStatusSelect(p)}
+        <select class="form-select" style="width:110px;font-size:12px;padding:5px 8px;" onchange="updateProjectField('${p.id}','size',this.value)" onclick="event.stopPropagation()" title="Tamaño del proyecto">
+          <option value="small" ${p.size==='small'?'selected':''}>Pequeño</option>
+          <option value="large" ${p.size==='large'?'selected':''}>Grande</option>
+        </select>
+        <label class="proj-flag"><input type="checkbox" ${p.fondo_cleared?'checked':''} onchange="toggleProjectFlag('${p.id}','fondo_cleared',this.checked)"> Fondo (CFSE)</label>
+        <label class="proj-flag"><input type="checkbox" ${p.coi_cleared?'checked':''} onchange="toggleProjectFlag('${p.id}','coi_cleared',this.checked)"> Seguro (COI)</label>
+        <label class="proj-flag"><input type="checkbox" ${p.permits_required?'checked':''} onchange="toggleProjectFlag('${p.id}','permits_required',this.checked)"> Requiere permisos</label>
+        ${p.permits_required ? `<label class="proj-flag"><input type="checkbox" ${p.permits_cleared?'checked':''} onchange="toggleProjectFlag('${p.id}','permits_cleared',this.checked)"> Permisos listos</label>` : ''}
+        ${p.primary_quote_id ? `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openProjectQuote('${p.primary_quote_id}')">Ver cotización</button>` : ''}
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteProject('${p.id}')">Eliminar</button>
+      </div>
+    </div>`;
+  return el;
+}
+
+async function updateProjectField(id, field, value) {
+  await sb.from('projects').update({ [field]: value }).eq('id', id);
+  const p = projectsCache.find(x => x.id === id);
+  if (p) p[field] = value;
+  renderProjectStats();
+  renderProjectsList();
+}
+function toggleProjectFlag(id, field, checked) {
+  return updateProjectField(id, field, checked);
+}
+
+async function openProjectQuote(quoteId) {
+  if (!quotesCache.length) await loadAndRenderQuotes();
+  loadQuoteForEditing(quoteId);
+}
+
+async function deleteProject(id) {
+  const p = projectsCache.find(x => x.id === id);
+  if (!confirm(`¿Eliminar ${p?.project_number || 'este proyecto'}? La cotización NO se borra — solo se desvincula.`)) return;
+  // Unlink any quotes first (FK has no cascade), then delete the project.
+  await sb.from('quotes').update({ project_id: null }).eq('project_id', id);
+  await sb.from('projects').delete().eq('id', id);
+  projectsCache = projectsCache.filter(x => x.id !== id);
+  quotesCache.forEach(q => { if (q.project_id === id) { q.project_id = null; q._projectNumber = null; } });
+  renderProjectStats();
+  renderProjectsList();
+  toast('Proyecto eliminado.', 'success');
 }
 
 // ============================================================
