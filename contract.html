@@ -110,8 +110,8 @@ const STANDARD_CLAUSES = {
   exclusions: "Unless expressly listed in the scope of work, this agreement excludes: permits and government fees; architectural or engineering services; hazardous-material testing or abatement (asbestos, mold, lead); moving or protecting the Client's furnishings and belongings; work on concealed conditions not reasonably visible at the time of quoting; and any work not described in the scope.",
   timeline: "Domo will begin and complete the work on a schedule communicated to the Client. Start and completion dates are good-faith estimates and may be adjusted for change orders, weather, permit delays, material availability, Client-caused delays, or events beyond Domo's reasonable control (force majeure). Time is not of the essence unless a specific completion date is stated in writing.",
   permits: "Where permits are required, the party identified in the scope is responsible for obtaining them; if not stated, the Client authorizes Domo to obtain required permits and reimburses their actual cost. The Client warrants it has the authority to permit the work at the property and will provide any homeowner-association or landlord approvals needed.",
-  insurance: "Domo carries general liability insurance and maintains Puerto Rico workers' compensation coverage through the Corporación del Fondo del Seguro del Estado (CFSE) for its personnel. Certificates are available on request. Each party is responsible for its own negligence, and each indemnifies the other against third-party claims arising from its own negligent acts or omissions in connection with the work.",
-  materials: "Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Substitutions of equivalent quality may be made when a specified item is unavailable. Title to and risk of loss for materials pass to the Client upon delivery to the site or upon payment, whichever is earlier. Materials outside the described scope are billed separately with receipts.",
+  insurance: "Domo is registered with Puerto Rico's Department of Consumer Affairs (DACO) under Act 220-2012 and maintains the general liability insurance and contract bond required by DACO regulations, together with Puerto Rico workers' compensation coverage through the Corporación del Fondo del Seguro del Estado (CFSE) for its personnel. Certificates are available on request. Each party is responsible for its own negligence, and each indemnifies the other against third-party claims arising from its own negligent acts or omissions in connection with the work.",
+  materials: "A detailed list of the principal materials — with brand, model, color, and specifications where applicable — is set out in the attached quote, which forms part of this agreement. Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Substitutions of equivalent quality may be made when a specified item is unavailable, with notice to the Client. Title to and risk of loss for materials pass to the Client upon delivery to the site or upon payment, whichever is earlier. Materials outside the described scope are billed separately with receipts.",
   site: "The Client provides safe and reasonable access to the work area during working hours, along with water and electricity at the site at no charge to Domo. The Client is responsible for clearing and protecting personal property in the work area. Domo is not responsible for pre-existing conditions or for damage to items the Client failed to remove or disclose.",
   cleanup: "Domo removes its debris and leaves the work area in broom-clean condition at completion. Disposal of construction debris is included only where stated in the scope; otherwise it is billed at cost.",
   termination: "Either party may terminate this agreement for material breach if the breach is not cured within ten (10) days of written notice. Upon termination, the Client pays for all work performed and materials supplied through the termination date, plus any non-cancellable commitments. Non-payment is a material breach and entitles Domo to suspend work.",
@@ -152,7 +152,7 @@ function setFooter(){
   const name = company.company_name || 'Domo';
   const bits = [name, company.company_phone, company.company_email, company.company_website].filter(Boolean).map(esc);
   document.getElementById('foot').innerHTML = bits.join(' · ')
-    + '<div style="margin-top:8px;font-size:11px;color:var(--faint);max-width:600px;margin-left:auto;margin-right:auto;">This agreement is a general construction services contract and is not legal advice. Terms should be reviewed by qualified counsel for your situation.</div>';
+    + '<div style="margin-top:8px;font-size:11px;color:var(--faint);max-width:640px;margin-left:auto;margin-right:auto;">This is a general construction services contract, not legal advice. Puerto Rico home-improvement contracts are regulated by DACO (Act 220-2012); the contractor should be DACO-registered and this document reviewed by qualified counsel before use.</div>';
 }
 
 function render(){
@@ -219,7 +219,7 @@ function render(){
         <div class="party">
           <div class="role">Contractor</div>
           <div class="name">${esc(companyName)}</div>
-          <div class="meta">${[company.company_phone,company.company_email].filter(Boolean).map(esc).join('<br>')||'Puerto Rico'}</div>
+          <div class="meta">${[company.company_address,company.company_phone,company.company_email].filter(Boolean).map(esc).join('<br>')||'Puerto Rico'}${(company.company_daco_reg||company.company_license)?`<br>${[company.company_daco_reg?('DACO Reg. '+esc(company.company_daco_reg)):'',company.company_license?('Lic. '+esc(company.company_license)):''].filter(Boolean).join(' · ')}`:''}</div>
         </div>
         <div class="party">
           <div class="role">Client</div>
@@ -243,7 +243,11 @@ function render(){
       <h2 class="sec">Payment schedule</h2>
       <div class="terms"><p>${esc(c.payment_terms || defaultPay)}</p></div>
 
-      ${clause('Schedule', STANDARD_CLAUSES.timeline)}
+      ${clause('Schedule', [
+        c.start_date ? `Estimated start date: ${fmtDate(c.start_date)}.` : '',
+        c.completion_date ? `Estimated completion date: ${fmtDate(c.completion_date)}.` : '',
+        STANDARD_CLAUSES.timeline
+      ].filter(Boolean).join(' '))}
       ${clause('Changes to the work', terms.change_order)}
       ${clause('Permits &amp; licenses', STANDARD_CLAUSES.permits)}
       ${clause("Insurance &amp; workers' compensation", STANDARD_CLAUSES.insurance)}

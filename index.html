@@ -719,6 +719,17 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
       </div>
     </div>
     <div class="card mt-16" style="max-width:600px;">
+      <div class="section-title">Datos legales (contrato)</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Dirección física</label><input class="form-input" id="s-address" placeholder="Calle, Municipio, PR, ZIP" /></div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="form-group"><label class="form-label">Registro DACO #</label><input class="form-input" id="s-daco" placeholder="Ley 220-2012" /></div>
+        <div class="form-group"><label class="form-label">Licencia #</label><input class="form-input" id="s-license" /></div>
+      </div>
+      <div style="font-size:12px;color:var(--mid);">Aparecen en el contrato como divulgación requerida por DACO.</div>
+    </div>
+    <div class="card mt-16" style="max-width:600px;">
       <div class="section-title">Default Margins</div>
       <div class="form-row cols-3">
         <div class="form-group"><label class="form-label">Labor %</label><input class="form-input" id="s-margin-labor" type="number" /></div>
@@ -823,6 +834,10 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Depósito a cobrar</label><input class="form-input" id="cm-deposit-display" readonly style="background:var(--cream);font-weight:700;" /></div>
+    </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">Fecha de inicio (est.)</label><input class="form-input" type="date" id="cm-start" /></div>
+      <div class="form-group"><label class="form-label">Fecha de terminación (est.)</label><input class="form-input" type="date" id="cm-completion" /></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Calendario de pago (aparece en el contrato, en inglés)</label><textarea class="form-textarea" id="cm-terms" rows="3"></textarea></div>
@@ -1017,6 +1032,9 @@ function renderSettings() {
   document.getElementById('s-website').value = settingsCache.company_website || '';
   document.getElementById('s-tagline').value = settingsCache.company_tagline || '';
   document.getElementById('s-footer').value = settingsCache.pdf_footer || '';
+  document.getElementById('s-address').value = settingsCache.company_address || '';
+  document.getElementById('s-daco').value = settingsCache.company_daco_reg || '';
+  document.getElementById('s-license').value = settingsCache.company_license || '';
   document.getElementById('s-margin-labor').value = settingsCache.margin_labor || '40';
   document.getElementById('s-margin-materials').value = settingsCache.margin_materials || '25';
   document.getElementById('s-margin-equipment').value = settingsCache.margin_equipment || '25';
@@ -1030,6 +1048,9 @@ async function saveSettings() {
     { key: 'company_website', value: document.getElementById('s-website').value },
     { key: 'company_tagline', value: document.getElementById('s-tagline').value },
     { key: 'pdf_footer', value: document.getElementById('s-footer').value },
+    { key: 'company_address', value: document.getElementById('s-address').value },
+    { key: 'company_daco_reg', value: document.getElementById('s-daco').value },
+    { key: 'company_license', value: document.getElementById('s-license').value },
     { key: 'margin_labor', value: document.getElementById('s-margin-labor').value },
     { key: 'margin_materials', value: document.getElementById('s-margin-materials').value },
     { key: 'margin_equipment', value: document.getElementById('s-margin-equipment').value },
@@ -1977,7 +1998,11 @@ async function generateContract() {
   if (!p) return;
   const total = parseFloat(document.getElementById('cm-total').value) || 0;
   const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
+  // DACO: deposits over 30% may be treated as a deceptive practice in residential remodeling.
+  if (pct > 30 && !confirm('Un depósito mayor de 30% puede considerarse práctica engañosa bajo DACO (Ley 220). ¿Continuar de todos modos?')) return;
   const deposit = roundedDeposit(total, pct);
+  const startDate = document.getElementById('cm-start').value || null;
+  const completionDate = document.getElementById('cm-completion').value || null;
   const terms = (document.getElementById('cm-terms').value || '').trim();
   const btn = document.getElementById('cm-generate-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generando...';
@@ -1991,6 +2016,7 @@ async function generateContract() {
       project_id: pid, quote_id: p.primary_quote_id || null,
       client_name: p.client_name, client_email: p.client_email, client_property: p.client_property,
       scope, contract_total: total, deposit_amount: deposit, deposit_percent: pct,
+      start_date: startDate, completion_date: completionDate,
       payment_terms: terms || null,
       guarantee_terms: CONTRACT_DEFAULT_TERMS.guarantee,
       change_order_terms: CONTRACT_DEFAULT_TERMS.change_order,
