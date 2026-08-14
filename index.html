@@ -1998,8 +1998,8 @@ async function generateContract() {
   if (!p) return;
   const total = parseFloat(document.getElementById('cm-total').value) || 0;
   const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
-  // DACO: deposits over 30% may be treated as a deceptive practice in residential remodeling.
-  if (pct > 30 && !confirm('Un depósito mayor de 30% puede considerarse práctica engañosa bajo DACO (Ley 220). ¿Continuar de todos modos?')) return;
+  // Deposits over 30% are unusually high for residential remodeling — guard against typos.
+  if (pct > 30 && !confirm('Un depósito mayor de 30% es inusualmente alto para remodelación residencial. ¿Continuar de todos modos?')) return;
   const deposit = roundedDeposit(total, pct);
   const startDate = document.getElementById('cm-start').value || null;
   const completionDate = document.getElementById('cm-completion').value || null;
