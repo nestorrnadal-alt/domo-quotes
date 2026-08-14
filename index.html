@@ -830,7 +830,7 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
     <input type="hidden" id="cm-project-id" />
     <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">Total del contrato ($)</label><input class="form-input" type="number" id="cm-total" oninput="cmRecompute()" /></div>
-      <div class="form-group"><label class="form-label">Depósito %</label><input class="form-input" type="number" id="cm-deposit-pct" value="30" min="0" max="100" oninput="cmRecompute()" /></div>
+      <div class="form-group"><label class="form-label">Depósito %</label><input class="form-input" type="number" id="cm-deposit-pct" value="25" min="0" max="100" oninput="cmRecompute()" /></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Depósito a cobrar</label><input class="form-input" id="cm-deposit-display" readonly style="background:var(--cream);font-weight:700;" /></div>
@@ -1984,7 +1984,7 @@ function openContractModal(projectId) {
   if (p._contract) { toast('Este proyecto ya tiene un contrato.', 'error'); return; }
   document.getElementById('cm-project-id').value = projectId;
   document.getElementById('cm-total').value = (p.budget_total != null ? p.budget_total : '');
-  document.getElementById('cm-deposit-pct').value = '30';
+  document.getElementById('cm-deposit-pct').value = '25';
   const terms = document.getElementById('cm-terms');
   terms.value = ''; delete terms.dataset.touched;
   terms.oninput = () => { terms.dataset.touched = '1'; };
