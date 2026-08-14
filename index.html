@@ -2070,7 +2070,7 @@ async function renderBillingModal() {
       <div><span>Pendiente</span><b>$${r.remaining.toFixed(0)}</b></div>
     </div>
     <div class="bm-table">${rows || '<div style="color:var(--mid);font-size:13px;padding:6px 0;">Aún no hay hitos de facturación.</div>'}</div>
-    ${genBtn}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">${genBtn}${ms.length ? `<button class="btn btn-primary btn-sm" onclick="openPaymentBreakdown('${p.id}')">📄 Breakdown de pago</button>` : ''}</div>
     <div class="bm-add">
       <input type="text" id="bm-new-title" placeholder="Nuevo hito (ej. Rough-in)" class="form-input" style="flex:2;min-width:0;" />
       <input type="number" id="bm-new-amount" placeholder="$0" class="form-input" style="flex:1;min-width:0;" />
@@ -2110,6 +2110,126 @@ async function deleteMilestone(id) {
 }
 
 // Seed the schedule of values from the signed/generated contract: deposit + balance.
+// Branded, printable "Breakdown de Pagos" for a project — built from the
+// schedule of values. Decoupled from BookingKoala (which is created manually).
+async function openPaymentBreakdown(pid) {
+  const p = projectsCache.find(x => x.id === pid);
+  if (!p) return;
+  const { data } = await sb.from('project_milestones').select('*').eq('project_id', pid).order('sort_order');
+  const ms = data || [];
+  const co = (typeof settingsCache !== 'undefined' ? settingsCache : {}) || {};
+  const M = n => '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const PCT = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+
+  // Group milestones by phase (the "Fase N" prefix before the first "·").
+  const groups = {};
+  ms.forEach(m => {
+    const parts = (m.title || '').split('·');
+    const phase = parts.length > 1 ? parts[0].trim() : 'General';
+    const item = parts.length > 1 ? parts.slice(1).join('·').trim() : (m.title || '');
+    (groups[phase] = groups[phase] || []).push({ m, item });
+  });
+
+  const vals = m => {
+    const acord = +m.amount || 0;
+    const fact = (m.status === 'invoiced' || m.status === 'paid') ? acord : 0;
+    const cobr = m.status === 'paid' ? acord : 0;
+    return { acord, fact, cobr, pend: acord - fact };
+  };
+  let T = { acord: 0, fact: 0, cobr: 0, pend: 0 };
+  ms.forEach(m => { const v = vals(m); T.acord += v.acord; T.fact += v.fact; T.cobr += v.cobr; T.pend += v.pend; });
+
+  const statusPill = s => ({ pending: ['Pendiente', '#eef1f9', '#6b7690'], invoiced: ['Facturado', '#e6ebfa', '#3652A5'], paid: ['Cobrado', '#e6f4ea', '#1a7f37'] }[s] || ['—', '#eee', '#666']);
+
+  let groupsHtml = '';
+  for (const [phase, items] of Object.entries(groups)) {
+    let g = { acord: 0, fact: 0, pend: 0 };
+    const rows = items.map(({ m, item }) => {
+      const v = vals(m); g.acord += v.acord; g.fact += v.fact; g.pend += v.pend;
+      const pl = statusPill(m.status);
+      return `<tr>
+        <td>${esc(item)}${m.bk_invoice_id ? ` <span class="bk">Fact. #${esc(m.bk_invoice_id)}</span>` : ''}</td>
+        <td class="n">${M(v.acord)}</td>
+        <td class="n">${M(v.fact)}</td>
+        <td class="n">${M(v.pend)}</td>
+        <td class="c"><span class="pill" style="background:${pl[1]};color:${pl[2]}">${pl[0]}</span></td>
+      </tr>`;
+    }).join('');
+    groupsHtml += `
+      <div class="phase">
+        <div class="phase-h">${esc(phase)}</div>
+        <table>
+          <thead><tr><th>Ítem</th><th class="n">Acordado</th><th class="n">Facturado</th><th class="n">Pendiente</th><th class="c">Estado</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td>Subtotal</td><td class="n">${M(g.acord)}</td><td class="n">${M(g.fact)}</td><td class="n">${M(g.pend)}</td><td class="c">${PCT(g.fact, g.acord)}</td></tr></tfoot>
+        </table>
+      </div>`;
+  }
+
+  const company = esc(co.company_name || 'Domo');
+  const contact = [co.company_phone, co.company_email, co.company_website].filter(Boolean).map(esc).join(' · ');
+  const today = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Breakdown de Pagos · ${esc(p.project_number || '')}</title>
+<style>
+  :root{--navy:#142543;--blue:#3652A5;--cyan:#8BD7D7;--ink:#142543;--soft:#48546e;--faint:#7b869e;--line:#e2e7f2;--bg:#eef1f8;}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;line-height:1.5}
+  .wrap{max-width:820px;margin:0 auto;padding:0 18px 60px}
+  header{background:linear-gradient(155deg,var(--navy),#1d3160 82%);color:#fff}
+  .hi{max-width:820px;margin:0 auto;padding:24px 18px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+  .logo{font-size:24px;font-weight:800}.logo .d{color:var(--cyan)}
+  .logo img{height:32px;display:block}
+  .htitle{text-align:right}.kick{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);font-weight:700}
+  h1{font-size:22px;margin:2px 0 0}
+  .meta{max-width:820px;margin:0 auto;padding:14px 18px 0;color:var(--soft);font-size:13px}
+  .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 4px}
+  .sc{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+  .sc span{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--faint);font-weight:700;display:block}
+  .sc b{font-size:18px;font-variant-numeric:tabular-nums}
+  .sc.f b{color:var(--blue)}.sc.c b{color:#1a7f37}
+  .phase{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:16px}
+  .phase-h{font-weight:800;font-size:15px;margin-bottom:8px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left}
+  th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}th.c,td.c{text-align:center}
+  thead th{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint)}
+  tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .bk{font-size:11px;color:var(--faint)}
+  .note{color:var(--faint);font-size:12px;margin-top:16px}
+  footer{max-width:820px;margin:0 auto;padding:16px 18px;color:var(--faint);font-size:12px;text-align:center}
+  .toolbar{max-width:820px;margin:0 auto;padding:14px 18px 0;text-align:right}
+  .print-btn{background:var(--blue);color:#fff;border:none;border-radius:9px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer}
+  @media print{.toolbar{display:none}body{background:#fff}.phase,.sc{border-color:#ccc}}
+</style></head><body>
+<header><div class="hi">
+  <div class="logo"><img src="https://dp3d2hb4975es.cloudfront.net/uploads/domo/2026/6/1/1780335566logosmall1.png" alt="Domo" onerror="this.outerHTML='domo<span class=\\'d\\'>.</span>'"/></div>
+  <div class="htitle"><div class="kick">Breakdown de Pagos</div><h1>${esc(p.title || p.project_number || '')}</h1></div>
+</div></header>
+<div class="toolbar"><button class="print-btn" onclick="window.print()">Imprimir / Guardar PDF</button></div>
+<div class="meta">${company}${contact ? ' · ' + contact : ''}<br>
+  Cliente: ${esc(p.client_name || '—')}${p.client_property ? ' · ' + esc(p.client_property) : ''} · ${esc(p.project_number || '')} · ${esc(today)}</div>
+<div class="wrap">
+  <div class="sum">
+    <div class="sc"><span>Total acordado</span><b>${M(T.acord)}</b></div>
+    <div class="sc f"><span>Facturado</span><b>${M(T.fact)}</b></div>
+    <div class="sc c"><span>Cobrado</span><b>${M(T.cobr)}</b></div>
+    <div class="sc"><span>Pendiente</span><b>${M(T.pend)}</b></div>
+  </div>
+  ${groupsHtml}
+  <p class="note">Montos en USD, IVU incluido. "Facturado" = emitido en BookingKoala; "Pendiente" = por facturar. Este documento es un resumen de pagos y no sustituye las facturas oficiales.</p>
+</div>
+<footer>${company}${contact ? ' · ' + contact : ''}</footer>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { toast('Permite las ventanas emergentes para ver el breakdown.', 'error'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
 async function generateMilestonesFromContract(pid) {
   const p = projectsCache.find(x => x.id === pid);
   if (!p || !p._contract) return;
