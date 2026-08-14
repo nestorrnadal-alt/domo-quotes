@@ -58,6 +58,7 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 .nav-item.active { color: var(--primary); font-weight: 600; border-left-color: var(--teal); background: rgba(139,215,215,0.14); }
 .nav-icon { font-size: 16px; width: 20px; text-align: center; }
 .nav-divider { height: 1px; background: var(--border); margin: 8px 24px; }
+.nav-toggle { display: none; }
 .sidebar-user { padding: 16px 24px; border-top: 1px solid var(--border); }
 .sidebar-user-name { font-size: 12px; color: var(--mid); font-weight: 500; }
 .sidebar-user-logout { font-size: 11px; color: var(--mid); opacity: 0.7; cursor: pointer; margin-top: 3px; }
@@ -287,22 +288,34 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
 /* ===== MOBILE / RESPONSIVE ===== */
 @media (max-width: 860px) {
   #app { flex-direction: column; }
-  /* Sidebar becomes a sticky top bar with a horizontally-scrolling nav */
+  /* Sidebar becomes a sticky top bar with a hamburger menu (accordion dropdown) */
   #sidebar {
-    position: sticky; top: 0; left: auto; bottom: auto;
-    width: 100%; height: auto; flex-direction: row; align-items: center;
-    gap: 6px; padding: 8px 12px; overflow-x: auto;
+    position: sticky; top: 0; left: auto; bottom: auto; z-index: 60;
+    width: 100%; height: auto; flex-direction: row; flex-wrap: wrap;
+    align-items: center; justify-content: space-between;
+    gap: 6px; padding: 10px 14px; overflow: visible;
   }
-  .logo { padding: 0 10px 0 0; margin-right: 2px; border-bottom: none; border-right: 1px solid var(--border); flex-shrink: 0; }
-  .logo img { max-width: 82px; }
+  .logo { order: 0; padding: 0; border-bottom: none; flex-shrink: 0; }
+  .logo img { max-width: 96px; }
   .logo-sub { display: none; }
-  .nav { flex-direction: row; padding: 0; gap: 2px; flex: 1; overflow-x: auto; }
-  .nav-item { border-left: none; border-bottom: 3px solid transparent; padding: 8px 12px; white-space: nowrap; font-size: 13px; }
-  .nav-item.active { border-left-color: transparent; border-bottom-color: var(--teal); }
-  .nav-divider { display: none; }
-  .sidebar-user { padding: 0 4px; border-top: none; flex-shrink: 0; }
-  .sidebar-user-name { display: none; }
-  .sidebar-user-logout { margin-top: 0; font-size: 12px; white-space: nowrap; }
+  .nav-toggle {
+    display: inline-flex; order: 2; align-items: center; justify-content: center;
+    width: 42px; height: 42px; border: 1px solid var(--border); border-radius: 10px;
+    background: white; font-size: 20px; line-height: 1; color: var(--dark); cursor: pointer; flex-shrink: 0;
+  }
+  /* The menu wraps to a full-width block below the bar, hidden until opened */
+  .nav {
+    order: 3; flex-basis: 100%; display: none; flex-direction: column; gap: 2px;
+    margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+  }
+  #sidebar.nav-open .nav { display: flex; }
+  .nav-item { border-left: none; border-radius: 9px; padding: 13px 14px; font-size: 15px; white-space: nowrap; }
+  .nav-item.active { border-left-color: transparent; background: var(--cream); color: var(--primary); font-weight: 600; }
+  .nav-divider { display: block; margin: 4px 10px; }
+  .sidebar-user { order: 4; flex-basis: 100%; display: none; padding: 10px 4px 2px; border-top: none; }
+  #sidebar.nav-open .sidebar-user { display: flex; align-items: center; justify-content: space-between; }
+  .sidebar-user-name { display: block; font-size: 13px; }
+  .sidebar-user-logout { margin-top: 0; font-size: 13px; white-space: nowrap; }
 
   #main { margin-left: 0; max-width: 100%; padding: 18px 14px; }
   .page-header { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -431,6 +444,7 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
     <img src="https://cdn.bookingkoala.com/uploads/domo/2025/6/18/1750251311LogoDomoYourHome.png" alt="Domo" />
     <div class="logo-sub">Quote Tool</div>
   </div>
+  <button class="nav-toggle" onclick="toggleNav()" aria-label="Menú" aria-expanded="false">☰</button>
   <div class="nav">
     <div class="nav-item active" data-page="new-quote"><span class="nav-icon">✦</span><span>Nueva cotización</span></div>
     <div class="nav-item" data-page="quotes"><span class="nav-icon">◈</span><span>Cotizaciones</span></div>
@@ -958,7 +972,23 @@ document.querySelectorAll('.nav-item').forEach(el => {
   el.addEventListener('click', () => showPage(el.dataset.page));
 });
 
+// Mobile hamburger: toggle the dropdown menu.
+function toggleNav() {
+  const bar = document.getElementById('sidebar');
+  const open = bar.classList.toggle('nav-open');
+  const btn = bar.querySelector('.nav-toggle');
+  if (btn) { btn.textContent = open ? '✕' : '☰'; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
+}
+function closeNav() {
+  const bar = document.getElementById('sidebar');
+  if (!bar.classList.contains('nav-open')) return;
+  bar.classList.remove('nav-open');
+  const btn = bar.querySelector('.nav-toggle');
+  if (btn) { btn.textContent = '☰'; btn.setAttribute('aria-expanded', 'false'); }
+}
+
 function showPage(page) {
+  closeNav(); // collapse the mobile menu on navigation
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
