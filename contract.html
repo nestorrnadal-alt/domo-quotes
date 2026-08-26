@@ -73,10 +73,27 @@
   @keyframes spin{to{transform:rotate(360deg);}}
   footer{max-width:760px;margin:0 auto;padding:20px 18px;color:var(--faint);font-size:12px;text-align:center;}
   @media(max-width:560px){.parties{grid-template-columns:1fr;}}
-  @media print{header{-webkit-print-color-adjust:exact;print-color-adjust:exact;} .sign-card,.btn,.sig-clear{}}
+  /* print / download for signature (non-techy: sign on paper) */
+  .print-btn{position:fixed;top:14px;right:14px;z-index:50;display:none;background:var(--blue);color:#fff;
+    border:none;border-radius:9px;padding:10px 15px;font-size:13px;font-weight:700;cursor:pointer;
+    box-shadow:0 3px 12px rgba(20,37,67,.2);font-family:inherit;}
+  .print-btn:hover{background:#2b4590;}
+  .print-sign{display:none;}
+  .print-sign .row{display:grid;grid-template-columns:1fr 1fr;gap:40px;}
+  .print-sign .ln{border-bottom:1px solid #333;height:46px;margin-bottom:6px;}
+  .print-sign .cap{font-size:12px;color:#333;}
+  @media print{
+    header{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    .print-btn,.sign-card,#loading{display:none!important;}
+    body:not([data-status="signed"]) .print-sign{display:block;}
+    .card{box-shadow:none;border-color:#dfe4ec;break-inside:avoid;}
+    h2.sec{break-after:avoid;}
+    @page{margin:14mm 12mm;}
+  }
 </style>
 </head>
 <body>
+<button class="print-btn" id="printBtn" onclick="window.print()" title="Descargar o imprimir para firma">⬇ Imprimir / PDF</button>
 <header>
   <div class="head-inner">
     <img class="logo-img" src="https://dp3d2hb4975es.cloudfront.net/uploads/domo/2026/6/1/1780335566logosmall1.png" alt="Domo" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block';" />
@@ -261,8 +278,18 @@ function render(){
       ${clause('Dispute resolution &amp; governing law', STANDARD_CLAUSES.disputes)}
       ${clause('General', STANDARD_CLAUSES.general)}
     </div>
+    <div class="card print-sign">
+      <h2 class="sec" style="margin-top:0;border-top:none;padding-top:0;">Signatures</h2>
+      <div class="row">
+        <div><div class="ln"></div><div class="cap">Client — ${esc(c.client_name||'')} &middot; Date</div></div>
+        <div><div class="ln"></div><div class="cap">For ${esc(companyName)} &middot; Date</div></div>
+      </div>
+      <p class="cap" style="margin-top:16px;">By signing above, the Client agrees to the scope, price, payment schedule and terms in this agreement. A copy is provided to the Client.</p>
+    </div>
     ${signedBlock}${signForm}${voidBlock}`;
 
+  document.body.setAttribute('data-status', c.status);
+  document.getElementById('printBtn').style.display = 'block';
   setFooter();
   if(c.status==='draft'||c.status==='sent') initSigPad();
 }
