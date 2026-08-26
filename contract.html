@@ -144,9 +144,6 @@ const CLAUSES = {
   general: "Domo performs as an independent contractor, not an employee or partner of the Client. This agreement, together with the quote delivered with it and any approved change orders, is the entire agreement and supersedes prior discussions, proposals and estimates. Neither party may assign it without the other's written consent, not to be unreasonably withheld. If any provision is unenforceable, the remainder stays in effect. This agreement may be signed electronically, with the same effect as a handwritten signature.\n\nThis agreement is governed by the laws of the Commonwealth of Puerto Rico. The parties will first try to resolve any dispute in good faith directly, within fifteen (15) days of written notice. Unresolved disputes go to the Court of First Instance, San Juan Judicial Region. The prevailing party in an action to enforce this agreement is entitled to its reasonable attorney's fees and costs. Nothing here prevents either party from bringing a claim before the Puerto Rico Department of Consumer Affairs (DACo)."
 };
 
-// Company-wide default rates for change-order / permit language (override via settings).
-const RATE_DEFAULTS = { hourly:65, markup:15, remob:450, permit:150 };
-
 const params = new URLSearchParams(location.search);
 const token = params.get('t') || params.get('token');
 let contract = null, company = {};
@@ -188,12 +185,6 @@ function render(){
   const c = contract;
   const companyName = company.company_name || 'Domo';
   const terms = { guarantee: c.guarantee_terms || DEFAULT_TERMS.guarantee };
-  const R = {
-    hourly: Number(company.company_hourly_rate)||RATE_DEFAULTS.hourly,
-    markup: Number(company.company_material_markup)||RATE_DEFAULTS.markup,
-    remob:  Number(company.company_remob_fee)||RATE_DEFAULTS.remob,
-    permit: Number(company.company_permit_fee)||RATE_DEFAULTS.permit,
-  };
   const total = Number(c.contract_total)||0;
   const deposit = Number(c.deposit_amount)||0;
   const balance = Math.max(0, total - deposit);
@@ -241,7 +232,7 @@ function render(){
     (deposit>0
       ? `A deposit of ${money(deposit)}${c.deposit_percent?` (~${c.deposit_percent}%)`:''} is due on signing to reserve the crew and start date; it is credited back to the Client against the earliest weekly invoices. Domo then bills every week for the work completed that week, valued at the line-item prices in the quote.`
       : 'Domo bills every week for the work completed that week, valued at the line-item prices in the quote.')
-      + ' Total billing before substantial completion — deposit and weekly invoices combined — will not exceed 85% of the contract price; the remaining 15% is billed only at the walkthrough.',
+      + ' Total billing before substantial completion — deposit and weekly invoices combined — will not exceed 90% of the contract price; the remaining 10% is billed only at the walkthrough.',
     'Weekly invoices are due within five (5) calendar days. Amounts unpaid more than ten (10) calendar days after their due date carry a late charge of 1.5% per month on the overdue amount; Domo owes the Client the same 1.5% per month on any amount it must refund and does not refund on time. If an invoice is more than ten (10) calendar days overdue, Domo may suspend work on written notice until it is paid, and the schedule extends by the suspension plus two (2) working days to remobilize. Paying an invoice is not acceptance of the work and does not waive the warranty. If the Client disputes an item, the Client pays the undisputed part on time and raises the disputed item in writing within those five (5) days.'
   ].join('\n\n');
 
@@ -256,12 +247,12 @@ function render(){
   const schedule = (dateLine ? dateLine + ' ' : '')
     + 'The start and substantial-completion dates above are good-faith estimates.' + firmLine
     + ' They extend, without penalty to either party, by the time actually lost to approved change orders, concealed conditions, permit delays, material shortages, Client-caused delays, and events beyond Domo’s reasonable control, including severe weather, hurricane warnings, utility interruptions, strikes and government action. Domo will notify the Client in writing when any of these arises and state the expected extension.'
-    + `\n\nIf the Client suspends the work, or delays access, a decision or a selection, by more than five (5) working days, Domo may charge a remobilization fee of ${money(R.remob)} on written notice given before the charge is incurred.`;
+    + `\n\nIf the Client suspends the work, or delays access, a decision or a selection, by more than five (5) working days, Domo may charge a reasonable remobilization fee, quoted to the Client in writing before the charge is incurred.`;
 
   const changes = c.change_order_terms ||
-    `Any change to the scope, materials, price or schedule must be approved in writing before the additional work begins. Email or WhatsApp is fine — a written approval sent from the Client’s email address or phone number in this agreement counts as a signature. Unless a fixed price is agreed for the change, additional work is billed at ${money(R.hourly)} per worker-hour including IVU, plus materials at cost plus ${R.markup}%. Approved changes adjust the total price and the dates above. Domo is not obligated to perform work that has not been approved in writing.`;
+    `Any change to the scope, materials, price or schedule must be approved in writing before the additional work begins. Email or WhatsApp is fine — a written approval sent from the Client’s email address or phone number in this agreement counts as a signature. Domo quotes the additional work — a fixed price or an agreed rate, plus materials at cost with receipts — and begins only once the Client approves it in writing. Approved changes adjust the total price and the dates above. Domo is not obligated to perform work that has not been approved in writing.`;
 
-  const permits = `Permits and government fees are the Client’s responsibility and are not included in the price. At the Client’s written request, Domo will obtain permits as the Client’s agent, and the Client reimburses the actual fees plus a handling charge of ${money(R.permit)} per permit. The Client confirms it owns the property or has authority to permit the work, and will obtain any homeowner-association, condominium or landlord approvals required. Neither party is responsible for delays caused by permitting authorities or associations.`;
+  const permits = `Permits and government fees are the Client’s responsibility and are not included in the price. At the Client’s written request, Domo will obtain permits as the Client’s agent, and the Client reimburses the actual fees plus a reasonable handling charge agreed in advance. The Client confirms it owns the property or has authority to permit the work, and will obtain any homeowner-association, condominium or landlord approvals required. Neither party is responsible for delays caused by permitting authorities or associations.`;
 
   const cancellation = c.cancellation_terms || null; // if set, render as one clause; else use 3-day + after
 
@@ -297,7 +288,7 @@ function render(){
         ${deposit>0?`<div class="lbl deposit">Deposit due on signing</div><div class="val deposit">${money(deposit)}${c.deposit_percent?` (~${esc(c.deposit_percent)}%)`:''}</div>`:''}
         ${deposit>0?`<div class="lbl">Balance (billed in progress + final)</div><div class="val">${money(balance)}</div>`:''}
       </div>
-      <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">Prices are in USD and fixed for the scope described. IVU is included in the total above and in every rate stated in this agreement. This price is open for acceptance for thirty (30) days from the quote date. Materials outside the described scope are billed separately at cost plus ${R.markup}%, with receipts.</p>
+      <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">Prices are in USD and fixed for the scope described. IVU is included in the total above and in every rate stated in this agreement. This price is open for acceptance for thirty (30) days from the quote date. Materials outside the described scope are quoted and billed separately at cost, with receipts.</p>
 
       <h2 class="sec">Payment schedule</h2>
       <div class="terms">${paras(payment)}</div>
