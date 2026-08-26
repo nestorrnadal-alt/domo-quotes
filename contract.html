@@ -48,6 +48,9 @@
   .terms{font-size:14px;color:var(--soft);}
   .terms p{margin:0 0 10px;}
   .terms b{color:var(--ink);}
+  .flagbox{background:#fff8e6;border:1px solid #e8d5a3;border-radius:10px;padding:14px 16px;font-size:14px;color:var(--ink);
+    print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+  .flagbox p{margin:0 0 10px;} .flagbox p:last-child{margin-bottom:0;}
   /* signature */
   .sign-card{border:2px solid var(--blue);}
   .field{margin:14px 0;}
@@ -115,27 +118,34 @@ const SUPABASE_URL = 'https://mpgljurndbfusxtcrogr.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_eSqiIIUFZck9XFdpgE3Ctg_u3-lBI88';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// Commercial terms snapshotted per contract (may be overridden by the contract row):
+// Warranty text (overridable per contract via c.guarantee_terms).
 const DEFAULT_TERMS = {
-  guarantee: "Domo warrants its workmanship for one (1) year from substantial completion. If work performed under this agreement fails to meet the agreed scope due to faulty workmanship, notify Domo in writing within the warranty period and Domo will correct it at no additional labor cost. Manufacturer warranties on materials and equipment pass through to the Client. This warranty does not cover damage from misuse, neglect, normal wear, movement or settling of the structure, water intrusion from causes outside the scope, or work altered or performed by others.",
-  change_order: "Any change to the scope, materials, quantities, or price must be documented in a written change order (email or WhatsApp is acceptable) and approved by both parties before the additional work begins. Approved change orders adjust the contract price and the schedule accordingly. Concealed or unforeseen conditions discovered during the work (e.g. hidden damage, code issues) are handled as change orders.",
-  cancellation: "Either party may cancel before work begins with written notice. If the Client cancels after the deposit is paid, the deposit is applied to scheduling, evaluation, design, and any materials or equipment already ordered or restocking fees incurred, and is non-refundable to that extent; any excess is refunded. If the Client cancels after work has begun, the Client pays for all work performed and materials supplied through the cancellation date."
+  guarantee: "Domo stands behind its work. For one (1) year from substantial completion, Domo will correct at no charge any part of the completed work that fails because of defective workmanship — electrical connections, plumbing connections, block and structural-adjacent work, and anything that stops functioning as intended. Cosmetic and finish items are covered for ninety (90) days: plaster and joint cracking, nail pops, minor settlement movement, and surface finish; cracking, nail pops and movement that appear after the ninety-day cosmetic period are treated as normal settlement and are not covered. Materials, appliances and fixtures carry the manufacturer's warranty, which Domo passes through to the Client. Neither warranty covers damage from misuse, neglect, normal wear, moisture or weather, alterations or repairs by others, Client-supplied materials, or work Domo was directed to perform over its own written recommendation. Notify Domo in writing within the applicable period and allow reasonable access to inspect and correct. This warranty is in addition to, and does not replace or limit, any right the Client has under Puerto Rico law, including the warranty against hidden defects and the builder's liability for a structure under the Civil Code."
 };
 
-// Standard construction clauses rendered on every agreement (boilerplate):
-const STANDARD_CLAUSES = {
-  exclusions: "Unless expressly listed in the scope of work, this agreement excludes: permits and government fees; architectural or engineering services; hazardous-material testing or abatement (asbestos, mold, lead); moving or protecting the Client's furnishings and belongings; work on concealed conditions not reasonably visible at the time of quoting; and any work not described in the scope.",
-  timeline: "Domo will begin and complete the work on a schedule communicated to the Client. Start and completion dates are good-faith estimates and may be adjusted for change orders, weather, permit delays, material availability, Client-caused delays, or events beyond Domo's reasonable control (force majeure). Time is not of the essence unless a specific completion date is stated in writing.",
-  permits: "Where permits are required, the party identified in the scope is responsible for obtaining them; if not stated, the Client authorizes Domo to obtain required permits and reimburses their actual cost. The Client warrants it has the authority to permit the work at the property and will provide any homeowner-association or landlord approvals needed.",
-  insurance: "Each party is responsible for its own negligence and will indemnify the other against third-party claims arising from its own negligent acts or omissions in connection with the work.",
-  materials: "A detailed list of the principal materials — with brand, model, color, and specifications where applicable — is set out in the attached quote, which forms part of this agreement. Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Substitutions of equivalent quality may be made when a specified item is unavailable, with notice to the Client. Title to and risk of loss for materials pass to the Client upon delivery to the site or upon payment, whichever is earlier. Materials outside the described scope are billed separately with receipts.",
-  site: "The Client provides safe and reasonable access to the work area during working hours, along with water and electricity at the site at no charge to Domo. The Client is responsible for clearing and protecting personal property in the work area. Domo is not responsible for pre-existing conditions or for damage to items the Client failed to remove or disclose.",
-  cleanup: "Domo removes its debris and leaves the work area in broom-clean condition at completion. Disposal of construction debris is included only where stated in the scope; otherwise it is billed at cost.",
-  termination: "Either party may terminate this agreement for material breach if the breach is not cured within ten (10) days of written notice. Upon termination, the Client pays for all work performed and materials supplied through the termination date, plus any non-cancellable commitments. Non-payment is a material breach and entitles Domo to suspend work.",
-  liens: "Domo and its suppliers retain any lien rights provided by Puerto Rico law until paid in full. Upon final payment, Domo provides a release of any lien rights for the work covered by that payment.",
-  disputes: "This agreement is governed by the laws of the Commonwealth of Puerto Rico. The parties will first attempt to resolve any dispute in good faith directly. Unresolved disputes are subject to the courts of Puerto Rico. The prevailing party in any action to enforce this agreement is entitled to its reasonable attorney's fees and costs.",
-  general: "Domo performs as an independent contractor, not an employee or partner of the Client. This agreement, together with the referenced quote and any signed change orders, is the entire agreement between the parties and supersedes prior discussions. If any provision is unenforceable, the remainder stays in effect. This agreement may be signed electronically, and an electronic signature has the same effect as a handwritten one."
+// Static legal clauses (plain text; \n\n = paragraph break). Dynamic clauses
+// (payment, schedule, changes, permits) are assembled in render() so they use
+// the contract's own numbers.
+const CLAUSES = {
+  finish_note: "Finish standard: surfaces are delivered patched, plastered and ready for paint. Painting, priming and final finishes are included only where listed in the scope above or in the quote.",
+  not_included: "Unless expressly listed in the scope of work above or in the quote, this agreement excludes: permits and government fees; architectural, engineering or design services; hazardous-material testing or abatement (asbestos, mold, lead); structural repair or reinforcement; moving, storing or protecting the Client's furnishings and belongings; appliances, fixtures and finishes supplied by the Client; painting and final finishes; work on concealed conditions not visible to a contractor on reasonable inspection at the time of quoting; and any work not described in the scope.",
+  completion: "The work is substantially complete when the scope has been performed and the affected areas can be used for their intended purpose; minor items that do not prevent that use and can be corrected without significant disruption may remain.\n\nDomo notifies the Client and the parties walk the work together within five (5) working days, recording one written punch list of anything that does not meet the scope. The final payment is due at the walkthrough, except that the Client may hold back the reasonable cost of the punch items — priced by agreement, or by a third-party estimate if the parties cannot agree — and releases that holdback within three (3) working days of those items being corrected. Domo corrects punch items within ten (10) working days unless a part or trade requires longer.\n\nAs a backstop only: if fifteen (15) working days pass from Domo's notice without a walkthrough for reasons within the Client's control, and the Client has not given a written list of objections, the work is treated as substantially complete and the final payment becomes due — but the Client's punch-list holdback right and the warranty both survive. Using the finished rooms is not, by itself, acceptance of the work.",
+  concealed: "The scope and price are based on what was visible at the time of quoting. Except where the scope or quote says otherwise, all walls, ceilings and openings in the scope are assumed to be non-structural and non-load-bearing, based on visual inspection only.\n\nIf Domo encounters a concealed condition — hidden piping or wiring, water damage, termite or structural damage, unpermitted prior work, or suspected hazardous material — or if any element proves to be load-bearing, Domo stops work in that area, notifies the Client within twenty-four (24) hours with photographs, and prices the additional work as a change order. Structural repair, engineering and hazardous-material abatement are outside this agreement unless the scope or quote includes them, and are the Client's to authorize and pay for. If the Client does not decide within five (5) working days of the notice, the schedule extends by the delay and the remobilization fee described above may apply.",
+  materials: "Principal materials — with brand, model, color and specification where applicable — are listed in the quote delivered with this agreement. Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Where a specified item is unavailable or discontinued, Domo notifies the Client and may substitute an item of equal or better quality and specification.\n\nTitle and risk of loss for materials pass to the Client on delivery to the site or on payment, whichever is earlier — except that Domo remains responsible for loss or damage caused by Domo, its employees or its subcontractors. A material price increase adjusts the price only where it exceeds 10% of that item's quoted cost, arises after a Client-caused delay of more than ten (10) working days, and is shown to the Client with supplier documentation before the material is ordered.",
+  site: "Domo works from 7:00 a.m. to 3:00 p.m., Monday through Friday, and may stay until 5:00 p.m. at no extra charge where finishing a task in progress avoids leaving the area unsafe or unusable overnight. The Client provides safe, unobstructed access from 7:00 a.m. to 5:00 p.m. on working days, along with water and electricity at the site at no charge to Domo; Saturday and evening work is by agreement.\n\nBefore the start date the Client clears the work area of furniture, belongings and anything fragile or valuable, and discloses in writing any condition it knows of behind the walls or under the floors. Domo is not responsible for pre-existing conditions, for damage to items the Client failed to remove after being asked, or for ordinary dust and vibration inherent in demolition work; this does not excuse damage caused by Domo's own negligence. Where the Client supplies appliances, fixtures or finishes, they must be on site before the week they are needed, and selections are due at least five (5) working days before they are needed.",
+  responsibility: "Each party is responsible for its own negligence and will indemnify the other against third-party claims arising from its own negligent acts or omissions in connection with the work. Domo may perform the work through its own personnel or qualified subcontractors and remains responsible to the Client for the work either way. The Client maintains its own property and homeowner's insurance in force throughout the work.",
+  cleanup: "Domo removes its debris and leaves the work area in broom-clean condition — swept, with construction debris, packaging and offcuts removed from the property — at completion. Disposal of construction debris is included where listed in the scope; otherwise it is billed at cost. Final detailed cleaning and painting-grade dust removal are not included.",
+  liability: "Please read this section — it limits what you can recover from Domo. Except for the items listed next, the most Domo can be required to pay under this agreement is the contract price. That limit does not apply to injury to a person, damage caused by Domo's gross negligence or willful misconduct, or Domo's indemnity obligations above. Neither party pays the other for knock-on losses — lost rental or business income, loss of use of the property, or a drop in property value. Nothing in this agreement limits a right or a liability that Puerto Rico law does not allow to be limited or waived.",
+  cancel_3day: "Your right to cancel. If the Client signed this agreement somewhere other than Domo's place of business, the Client may cancel it without cost or penalty within three (3) business days of signing, by written notice to Domo at the mailing or email address in this agreement. On a timely cancellation Domo refunds the full deposit within ten (10) days and bears the cost of anything it chose to order during those three days.",
+  cancel_after: "After the three-day period but before work begins, the Client may still cancel; Domo retains only its documented costs actually incurred — scheduling, evaluation, and non-returnable materials already ordered — and refunds the rest of the deposit within ten (10) days, with receipts. Once work has begun, the Client may end this agreement on written notice and pays for the work performed and materials supplied through that date, plus any non-cancellable commitments, plus Domo's documented direct costs of demobilizing. Domo may end this agreement on written notice if the property is unsafe or a condition makes the work impracticable, and refunds anything paid for work not performed.",
+  termination: "Either party may terminate for material breach if the breach is not cured within ten (10) calendar days of written notice. Non-payment is a material breach. If Domo is in default, the Client may terminate, recover any amount paid for work not performed, and recover the reasonable additional cost of having another contractor complete the scope, up to the unpaid balance of the contract price.",
+  liens: "Domo and its suppliers retain any lien rights provided by Puerto Rico law until paid in full. On final payment, Domo provides a written release of lien rights for the work covered by that payment.",
+  notices: "Notices of breach, suspension or termination must be in writing and sent by email — to Domo at info@domoyourhome.com and to the Client at the email address in this agreement — and are effective when sent. Each party keeps its email current. A notice to cancel under the three-day right may also be sent by mail to Domo's address. Day-to-day communication and change-order approvals may be by email or WhatsApp.",
+  general: "Domo performs as an independent contractor, not an employee or partner of the Client. This agreement, together with the quote delivered with it and any approved change orders, is the entire agreement and supersedes prior discussions, proposals and estimates. Neither party may assign it without the other's written consent, not to be unreasonably withheld. If any provision is unenforceable, the remainder stays in effect. This agreement may be signed electronically, with the same effect as a handwritten signature.\n\nThis agreement is governed by the laws of the Commonwealth of Puerto Rico. The parties will first try to resolve any dispute in good faith directly, within fifteen (15) days of written notice. Unresolved disputes go to the Court of First Instance, San Juan Judicial Region. The prevailing party in an action to enforce this agreement is entitled to its reasonable attorney's fees and costs. Nothing here prevents either party from bringing a claim before the Puerto Rico Department of Consumer Affairs (DACo)."
 };
+
+// Company-wide default rates for change-order / permit language (override via settings).
+const RATE_DEFAULTS = { hourly:65, markup:15, remob:450, permit:150 };
 
 const params = new URLSearchParams(location.search);
 const token = params.get('t') || params.get('token');
@@ -177,10 +187,12 @@ function render(){
   const el = document.getElementById('content'); el.style.display='block';
   const c = contract;
   const companyName = company.company_name || 'Domo';
-  const terms = {
-    guarantee: c.guarantee_terms || DEFAULT_TERMS.guarantee,
-    change_order: c.change_order_terms || DEFAULT_TERMS.change_order,
-    cancellation: c.cancellation_terms || DEFAULT_TERMS.cancellation,
+  const terms = { guarantee: c.guarantee_terms || DEFAULT_TERMS.guarantee };
+  const R = {
+    hourly: Number(company.company_hourly_rate)||RATE_DEFAULTS.hourly,
+    markup: Number(company.company_material_markup)||RATE_DEFAULTS.markup,
+    remob:  Number(company.company_remob_fee)||RATE_DEFAULTS.remob,
+    permit: Number(company.company_permit_fee)||RATE_DEFAULTS.permit,
   };
   const total = Number(c.contract_total)||0;
   const deposit = Number(c.deposit_amount)||0;
@@ -219,10 +231,39 @@ function render(){
 
   const voidBlock = c.status==='void' ? `<div class="card"><div class="state-msg">This agreement has been voided by Domo. Please contact us for an updated version.</div></div>` : '';
 
-  const clause = (title, body) => `<h2 class="sec">${title}</h2><div class="terms"><p>${esc(body)}</p></div>`;
-  const defaultPay = deposit>0
-    ? `A deposit of ${money(deposit)} is due on signing to schedule the work. The remaining ${money(balance)} is billed in progress as the work advances; each progress invoice is due within 15 days of its invoice date. Balances unpaid after 15 days accrue interest at 1.5% per month.`
-    : `Work is billed in progress as it advances; each invoice is due within 15 days of its invoice date. Late balances accrue interest at 1.5% per month.`;
+  const paras = body => body.split('\n\n').map(p=>`<p>${esc(p)}</p>`).join('');
+  const clause = (title, body) => `<h2 class="sec">${title}</h2><div class="terms">${paras(body)}</div>`;
+  const flagClause = (title, body) => `<h2 class="sec">${title}</h2><div class="flagbox">${paras(body)}</div>`;
+
+  // Payment schedule (revised weekly mechanics; adapts to the contract's deposit).
+  const payment = c.payment_terms || [
+    'Domo bills weekly for the work actually completed. Apart from the deposit, nothing is billed before the work it pays for is done.',
+    (deposit>0
+      ? `A deposit of ${money(deposit)}${c.deposit_percent?` (~${c.deposit_percent}%)`:''} is due on signing to reserve the crew and start date; it is credited back to the Client against the earliest weekly invoices. Domo then bills every week for the work completed that week, valued at the line-item prices in the quote.`
+      : 'Domo bills every week for the work completed that week, valued at the line-item prices in the quote.')
+      + ' Total billing before substantial completion — deposit and weekly invoices combined — will not exceed 85% of the contract price; the remaining 15% is billed only at the walkthrough.',
+    'Weekly invoices are due within five (5) calendar days. Amounts unpaid more than ten (10) calendar days after their due date carry a late charge of 1.5% per month on the overdue amount; Domo owes the Client the same 1.5% per month on any amount it must refund and does not refund on time. If an invoice is more than ten (10) calendar days overdue, Domo may suspend work on written notice until it is paid, and the schedule extends by the suspension plus two (2) working days to remobilize. Paying an invoice is not acceptance of the work and does not waive the warranty. If the Client disputes an item, the Client pays the undisputed part on time and raises the disputed item in writing within those five (5) days.'
+  ].join('\n\n');
+
+  // Schedule — good-faith estimates (no "time not of the essence"); firm when marked.
+  const dateLine = [
+    c.start_date ? `Start date: ${fmtDate(c.start_date)}.` : '',
+    c.completion_date ? `Substantial completion by: ${fmtDate(c.completion_date)}.` : ''
+  ].filter(Boolean).join(' ');
+  const firmLine = (c.hard_deadline && c.completion_date)
+    ? ` The parties agree the substantial-completion date above is a firm deadline; Domo will meet it except for the extension events listed below.`
+    : ` Where the parties expressly agree in writing that the completion date is a firm deadline, Domo will meet that date except for the extension events listed below.`;
+  const schedule = (dateLine ? dateLine + ' ' : '')
+    + 'The start and substantial-completion dates above are good-faith estimates.' + firmLine
+    + ' They extend, without penalty to either party, by the time actually lost to approved change orders, concealed conditions, permit delays, material shortages, Client-caused delays, and events beyond Domo’s reasonable control, including severe weather, hurricane warnings, utility interruptions, strikes and government action. Domo will notify the Client in writing when any of these arises and state the expected extension.'
+    + `\n\nIf the Client suspends the work, or delays access, a decision or a selection, by more than five (5) working days, Domo may charge a remobilization fee of ${money(R.remob)} on written notice given before the charge is incurred.`;
+
+  const changes = c.change_order_terms ||
+    `Any change to the scope, materials, price or schedule must be approved in writing before the additional work begins. Email or WhatsApp is fine — a written approval sent from the Client’s email address or phone number in this agreement counts as a signature. Unless a fixed price is agreed for the change, additional work is billed at ${money(R.hourly)} per worker-hour including IVU, plus materials at cost plus ${R.markup}%. Approved changes adjust the total price and the dates above. Domo is not obligated to perform work that has not been approved in writing.`;
+
+  const permits = `Permits and government fees are the Client’s responsibility and are not included in the price. At the Client’s written request, Domo will obtain permits as the Client’s agent, and the Client reimburses the actual fees plus a handling charge of ${money(R.permit)} per permit. The Client confirms it owns the property or has authority to permit the work, and will obtain any homeowner-association, condominium or landlord approvals required. Neither party is responsible for delays caused by permitting authorities or associations.`;
+
+  const cancellation = c.cancellation_terms || null; // if set, render as one clause; else use 3-day + after
 
   el.innerHTML = `
     <div class="card">
@@ -247,36 +288,36 @@ function render(){
 
       <h2 class="sec">Scope of work</h2>
       <div class="scope-box">${esc(c.scope||'See attached quote.')}</div>
-      ${clause('Exclusions', STANDARD_CLAUSES.exclusions)}
+      <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">${esc(CLAUSES.finish_note)}</p>
+      ${clause('What is not included', CLAUSES.not_included)}
 
       <h2 class="sec">Contract price</h2>
       <div class="price-grid">
-        <div class="lbl">Total</div><div class="val total">${money(total)}</div>
+        <div class="lbl">Total, including IVU</div><div class="val total">${money(total)}</div>
         ${deposit>0?`<div class="lbl deposit">Deposit due on signing</div><div class="val deposit">${money(deposit)}${c.deposit_percent?` (~${esc(c.deposit_percent)}%)`:''}</div>`:''}
-        ${deposit>0?`<div class="lbl">Balance (billed in progress)</div><div class="val">${money(balance)}</div>`:''}
+        ${deposit>0?`<div class="lbl">Balance (billed in progress + final)</div><div class="val">${money(balance)}</div>`:''}
       </div>
-      <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">Prices are in USD. Applicable IVU is included as shown on your quote. Materials outside the described scope are billed separately with receipts.</p>
+      <p style="font-size:12.5px;color:var(--faint);margin-top:8px;">Prices are in USD and fixed for the scope described. IVU is included in the total above and in every rate stated in this agreement. This price is open for acceptance for thirty (30) days from the quote date. Materials outside the described scope are billed separately at cost plus ${R.markup}%, with receipts.</p>
 
       <h2 class="sec">Payment schedule</h2>
-      <div class="terms"><p>${esc(c.payment_terms || defaultPay)}</p></div>
+      <div class="terms">${paras(payment)}</div>
 
-      ${clause('Schedule', [
-        c.start_date ? `Estimated start date: ${fmtDate(c.start_date)}.` : '',
-        c.completion_date ? `Estimated completion date: ${fmtDate(c.completion_date)}.` : '',
-        STANDARD_CLAUSES.timeline
-      ].filter(Boolean).join(' '))}
-      ${clause('Changes to the work', terms.change_order)}
-      ${clause('Permits &amp; licenses', STANDARD_CLAUSES.permits)}
-      ${clause('Responsibility', STANDARD_CLAUSES.insurance)}
-      ${clause('Materials, title &amp; risk of loss', STANDARD_CLAUSES.materials)}
-      ${clause('Site access &amp; utilities', STANDARD_CLAUSES.site)}
-      ${clause('Cleanup', STANDARD_CLAUSES.cleanup)}
+      ${clause('Schedule', schedule)}
+      ${clause('Completion &amp; walkthrough', CLAUSES.completion)}
+      ${clause('Changes to the work', changes)}
+      ${clause('Concealed &amp; structural conditions', CLAUSES.concealed)}
+      ${clause('Permits &amp; licenses', permits)}
+      ${clause('Materials, title &amp; risk of loss', CLAUSES.materials)}
+      ${clause('Site access &amp; client responsibilities', CLAUSES.site)}
+      ${clause('Responsibility', CLAUSES.responsibility)}
+      ${clause('Cleanup', CLAUSES.cleanup)}
       ${clause('Workmanship warranty', terms.guarantee)}
-      ${clause('Termination &amp; default', STANDARD_CLAUSES.termination)}
-      ${clause('Liens', STANDARD_CLAUSES.liens)}
-      ${clause('Cancellation', terms.cancellation)}
-      ${clause('Dispute resolution &amp; governing law', STANDARD_CLAUSES.disputes)}
-      ${clause('General', STANDARD_CLAUSES.general)}
+      ${flagClause('Limitation of liability', CLAUSES.liability)}
+      ${cancellation ? clause('Cancellation &amp; termination', cancellation) : flagClause('Cancellation — your right to cancel', CLAUSES.cancel_3day) + clause('Cancellation &amp; termination', CLAUSES.cancel_after)}
+      ${clause('Default', CLAUSES.termination)}
+      ${clause('Liens', CLAUSES.liens)}
+      ${clause('Notices', CLAUSES.notices)}
+      ${clause('Dispute resolution &amp; general', CLAUSES.general)}
     </div>
     <div class="card print-sign">
       <h2 class="sec" style="margin-top:0;border-top:none;padding-top:0;">Signatures</h2>
