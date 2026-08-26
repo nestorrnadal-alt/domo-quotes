@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Domo — Contract Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#1d2f5e; --navy-deep:#16233f; --ink:#2b3444; --body:#3f4a5c;
+    --muted:#7b8698; --accent:#2f5fd0; --line:#e4e8ef; --card:#ffffff;
+    --page:#f4f6fa; --flag:#fff8e6; --flag-line:#e8d5a3; --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--body);
+    font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px;line-height:1.64;-webkit-font-smoothing:antialiased}
+
+  /* ===================== BUILDER PANEL ===================== */
+  .builder{position:fixed;top:0;left:0;bottom:0;width:360px;z-index:60;background:#fff;
+    border-right:1px solid var(--line);overflow-y:auto;transform:translateX(-100%);
+    transition:transform .22s ease;box-shadow:2px 0 20px rgba(20,36,63,.06)}
+  body.panel-open .builder{transform:none}
+  .builder-inner{padding:20px 20px 60px}
+  .b-brand{font-weight:700;font-size:16px;color:var(--navy);display:flex;align-items:center;gap:8px;margin-bottom:2px}
+  .b-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent)}
+  .b-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+  .b-group{margin:18px 0 4px;font-size:10.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--navy);
+    border-top:1px solid var(--line);padding-top:14px}
+  .b-group:first-of-type{border-top:0;padding-top:0;margin-top:6px}
+  .b-field{margin-bottom:11px}
+  .b-field label{display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:4px}
+  .b-field .req{color:var(--accent)}
+  .b-field input,.b-field textarea,.b-field select{
+    width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-family:inherit;
+    font-size:13.5px;color:var(--ink);background:#fff}
+  .b-field input:focus,.b-field textarea:focus,.b-field select:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+  .b-field textarea{min-height:150px;resize:vertical;line-height:1.5}
+  .b-field.invalid input,.b-field.invalid textarea{border-color:#d14343;background:#fff6f6}
+  .b-hint{font-size:11px;color:var(--muted);margin-top:3px}
+  .b-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .b-load{display:flex;gap:8px;margin-bottom:14px}
+  .b-load input{flex:1}
+  .b-load button{flex:0 0 auto;border:0;background:var(--navy);color:#fff;border-radius:7px;padding:0 14px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer}
+  .b-load button:hover{background:var(--navy-deep)}
+  .b-actions{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--line);margin:20px -20px 0;padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+  .b-btn{border:0;border-radius:8px;padding:12px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+  .b-btn.primary{background:var(--accent);color:#fff}
+  .b-btn.primary:hover{background:#2650b8}
+  .b-btn.ghost{background:#eef1f8;color:var(--navy)}
+  .b-status{font-size:11.5px;color:var(--muted);text-align:center}
+  .b-warn{background:var(--flag);border:1px solid var(--flag-line);border-radius:7px;padding:9px 11px;font-size:12px;color:#7a5b00;margin-bottom:12px;display:none}
+  .b-warn.show{display:block}
+
+  .toggle{position:fixed;top:14px;left:14px;z-index:70;background:var(--navy);color:#fff;border:0;border-radius:8px;
+    padding:9px 13px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;box-shadow:0 3px 12px rgba(20,36,63,.2)}
+  body.panel-open .toggle{left:374px}
+  @media (max-width:1000px){ body.panel-open .toggle{left:14px} body.panel-open .builder{box-shadow:0 0 0 100vw rgba(20,36,63,.35), 2px 0 20px rgba(20,36,63,.2)} }
+
+  .doc-shell{transition:margin-left .22s ease}
+  @media (min-width:1001px){ body.panel-open .doc-shell{margin-left:360px} }
+
+  /* ===================== DOCUMENT (from Domo agreement) ===================== */
+  .wrap{max-width:880px;margin:0 auto;padding:0 20px 64px}
+  .band{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-deep) 100%);color:#fff;
+    border-radius:0 0 var(--radius) var(--radius);padding:40px 0 46px;margin-bottom:28px;
+    print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .band .wrap{padding-bottom:0}
+  .mark{font-size:17px;font-weight:600;color:#93a9e0;margin-bottom:26px}
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#93a9e0;margin-bottom:10px}
+  .band h1{font-size:38px;line-height:1.15;font-weight:700;margin:0;color:#fff;letter-spacing:-.01em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:38px 44px;margin-bottom:24px}
+  .meta{display:flex;justify-content:space-between;align-items:baseline;gap:20px;margin-bottom:30px}
+  .meta .date{color:var(--muted);font-size:14px}
+  .status{font-size:13px;font-weight:600;color:var(--accent)}
+  h2{font-size:13px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--navy);margin:38px 0 14px}
+  h2:first-of-type{margin-top:0}
+  p{margin:0 0 13px}
+  p:last-child{margin-bottom:0}
+  strong{color:var(--ink);font-weight:600}
+  hr{border:0;border-top:1px solid var(--line);margin:34px 0}
+  .flag{background:var(--flag);border:1px solid var(--flag-line);border-radius:8px;padding:18px 22px;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .flag p:last-child{margin-bottom:0}
+  .parties{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .party .role{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .party .name{font-size:19px;font-weight:600;color:var(--ink);margin-bottom:4px}
+  .party .detail{font-size:14px;color:var(--muted);line-height:1.6}
+  .propbox{margin-top:26px;border:1px solid var(--line);border-radius:10px;padding:18px 22px;background:#fbfcfe}
+  .propbox .role{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .propbox .addr{font-size:16px;font-weight:600;color:var(--ink)}
+  .scope{border:1px solid var(--line);border-radius:10px;padding:22px 26px;background:#fbfcfe}
+  .scope ol{margin:0;padding-left:20px}
+  .scope li{margin-bottom:7px}
+  .scope li:last-child{margin-bottom:0}
+  .total-row{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:14px;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .total-row .label{font-size:15px;color:var(--body)}
+  .total-row .amount{font-size:30px;font-weight:700;color:var(--ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .tablewrap{overflow-x:auto}
+  table.pay{width:100%;border-collapse:collapse;margin-bottom:14px;min-width:460px}
+  table.pay caption{text-align:left;font-size:13px;color:var(--muted);padding-bottom:12px}
+  table.pay th{text-align:left;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:0 0 10px;border-bottom:1px solid var(--line)}
+  table.pay th.r,table.pay td.r{text-align:right}
+  table.pay td{padding:13px 0;border-bottom:1px solid var(--line);vertical-align:top;font-size:14.5px}
+  table.pay tr:last-child td{border-bottom:0}
+  table.pay td.stage{font-weight:600;color:var(--ink);white-space:nowrap;padding-right:18px}
+  table.pay td.amt{font-weight:600;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .pay-now td{color:var(--accent)!important}
+  .fine{font-size:13px;color:var(--muted);line-height:1.6;margin-top:4px}
+  .dates{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:14px}
+  .dates .role{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .dates .val{font-size:17px;font-weight:600;color:var(--ink)}
+  .sign{background:var(--card);border:2px solid var(--accent);border-radius:var(--radius);padding:36px 44px}
+  .sign h2{margin-top:0}
+  .sign .lead{margin-bottom:26px}
+  .field-label{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:8px;display:block}
+  input.field{width:100%;border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-family:inherit;font-size:15px;color:var(--ink);background:#fff;margin-bottom:22px}
+  input.field:focus-visible,button:focus-visible,input[type=checkbox]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .padbox{border:1px dashed #c9d1de;border-radius:8px;height:150px;background:#fff;touch-action:none;cursor:crosshair;display:block;width:100%}
+  .padhint{position:relative;top:-92px;text-align:center;color:var(--muted);font-size:14px;pointer-events:none;margin-bottom:-20px}
+  .clear{font-size:13px;color:var(--accent);margin:8px 0 24px;display:inline-block;cursor:pointer}
+  .check{display:flex;gap:12px;align-items:flex-start;margin:22px 0}
+  .check input[type=checkbox]{width:19px;height:19px;flex:0 0 auto;margin:4px 0 0;accent-color:var(--accent)}
+  .check label{font-size:14.5px;line-height:1.6}
+  .btn{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:16px;font-family:inherit;font-size:16px;font-weight:600;margin-top:14px;cursor:pointer}
+  .secure{text-align:center;font-size:13px;color:var(--muted);margin-top:16px}
+  .sigline{margin-top:44px;border-top:1px solid var(--line);padding-top:8px;font-size:14px;color:var(--muted)}
+  .signed-stamp{display:none;margin:8px 0 22px;border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:#f6faf6}
+  .signed-stamp img{max-height:90px;display:block}
+  .signed-stamp .when{font-size:12.5px;color:var(--muted);margin-top:6px}
+  body.signed .signed-stamp{display:block}
+  body.signed #signName,body.signed .padbox,body.signed .padhint,body.signed [data-domo-clear],body.signed .btn{display:none}
+
+  /* print-only wet-signature block */
+  .print-sign{display:none;margin-top:40px}
+  .print-sign .cols{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+  .print-sign .ln{border-bottom:1px solid #333;height:46px;margin-bottom:6px}
+  .print-sign .cap{font-size:12px;color:#333}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;line-height:1.7;margin-top:34px}
+  footer .disclaim{font-size:12px;max-width:620px;margin:12px auto 0}
+
+  @media (max-width:640px){
+    .band{padding:32px 0 36px;border-radius:0}
+    .band h1{font-size:29px}
+    .card,.sign{padding:28px 22px}
+    .parties,.dates{grid-template-columns:1fr;gap:20px}
+    .total-row .amount{font-size:26px}
+  }
+  @media print{
+    .builder,.toggle{display:none!important}
+    .doc-shell{margin-left:0!important}
+    body{background:#fff}
+    .card,.sign{border-color:#dfe4ec;break-inside:avoid}
+    h2{break-after:avoid}
+    .btn,.secure,.padbox,.padhint,[data-domo-clear],#signName,.field-label#siglabel{display:none!important}
+    body:not(.signed) .print-sign{display:block}
+    .sign{border-width:1px}
+  }
+</style>
+</head>
+<body>
+
+<button class="toggle" id="toggle" aria-label="Editar contrato">☰ Editar</button>
+
+<!-- ===================== BUILDER ===================== -->
+<aside class="builder" id="builder" aria-label="Contract builder">
+  <div class="builder-inner">
+    <div class="b-brand"><span class="dot"></span> Contract Builder</div>
+    <div class="b-sub">Llena los campos y el contrato se actualiza en vivo. Descarga o imprime para firma.</div>
+
+    <div class="b-warn" id="warn"></div>
+
+    <div class="b-group">Cargar de cotización</div>
+    <div class="b-load">
+      <input id="loadQ" type="text" placeholder="Núm. cotización (ej. QT-0095)">
+      <button id="loadBtn" type="button">Cargar</button>
+    </div>
+    <div class="b-hint" style="margin-top:-8px;margin-bottom:6px">Trae cliente, propiedad, scope y total desde domo-quotes.</div>
+
+    <div class="b-group">Estado y fecha</div>
+    <div class="b-row">
+      <div class="b-field"><label>Estado</label><select id="f_status"><option>Draft</option><option>Final</option></select></div>
+      <div class="b-field"><label>Fecha del contrato</label><input id="f_contractDate" type="date"></div>
+    </div>
+
+    <div class="b-group">Contratista (Domo)</div>
+    <div class="b-field"><label>Razón social</label><input id="f_domoLegal" placeholder="Domo LLC"></div>
+    <div class="b-field"><label>Dirección</label><input id="f_domoAddr" placeholder="[street], San Juan, PR [zip]"></div>
+    <div class="b-row">
+      <div class="b-field"><label>Teléfono</label><input id="f_domoPhone" value="+1 787 419 0300"></div>
+      <div class="b-field"><label>Reg. comerciante</label><input id="f_domoReg" placeholder="[DACo / reg.]"></div>
+    </div>
+    <div class="b-field"><label>Firma por Domo</label><input id="f_domoSigner" value="Néstor Nadal, Domo"></div>
+
+    <div class="b-group">Cliente</div>
+    <div class="b-field"><label>Nombre <span class="req">*</span></label><input id="f_clientName" placeholder="Nombre del cliente"></div>
+    <div class="b-field"><label>Dirección postal</label><input id="f_clientAddr" placeholder="[mailing address]"></div>
+    <div class="b-row">
+      <div class="b-field"><label>Teléfono</label><input id="f_clientPhone" placeholder="[phone / WhatsApp]"></div>
+      <div class="b-field"><label>Email</label><input id="f_clientEmail" type="email" placeholder="cliente@email.com"></div>
+    </div>
+
+    <div class="b-group">Propiedad</div>
+    <div class="b-field" id="wrap_property"><label>Dirección de la obra <span class="req">*</span></label>
+      <input id="f_property" placeholder="Calle, unidad, municipio, PR"></div>
+
+    <div class="b-group">Cotización y scope</div>
+    <div class="b-row">
+      <div class="b-field"><label>Núm. cotización</label><input id="f_quoteNumber" placeholder="#Q-2026-0000"></div>
+      <div class="b-field"><label>Fecha cotización</label><input id="f_quoteDate" type="date"></div>
+    </div>
+    <div class="b-field"><label>Scope (una tarea por línea)</label>
+      <textarea id="f_scope" placeholder="Una partida por línea…"></textarea></div>
+
+    <div class="b-group">Precio</div>
+    <div class="b-field"><label>Total con IVU (USD)</label><input id="f_total" type="text" inputmode="decimal" placeholder="25015.66"></div>
+    <div class="b-hint" id="computed" style="margin-top:-6px">Depósito 25% y final 15% se calculan solos.</div>
+    <div class="b-row">
+      <div class="b-field"><label>Markup materiales</label><input id="f_markup" value="15%"></div>
+      <div class="b-field"><label>Tarifa por hora</label><input id="f_hourly" value="$65"></div>
+    </div>
+    <div class="b-row">
+      <div class="b-field"><label>Remobilización</label><input id="f_remob" value="$450"></div>
+      <div class="b-field"><label>Manejo permiso</label><input id="f_permit" value="$150"></div>
+    </div>
+    <div class="b-field"><label>Día de factura semanal</label><input id="f_invoiceDay" value="Friday"></div>
+
+    <div class="b-group">Calendario</div>
+    <div class="b-row">
+      <div class="b-field" id="wrap_start"><label>Inicio <span class="req">*</span></label><input id="f_start" type="date"></div>
+      <div class="b-field" id="wrap_finish"><label>Fin (subst.) <span class="req">*</span></label><input id="f_finish" type="date"></div>
+    </div>
+
+    <div class="b-actions">
+      <button class="b-btn primary" id="printBtn" type="button">⬇ Descargar / Imprimir para firma</button>
+      <button class="b-btn ghost" id="resetBtn" type="button">Nuevo contrato (borrar)</button>
+      <div class="b-status" id="saveStatus">Borrador guardado automáticamente en este navegador.</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ===================== DOCUMENT ===================== -->
+<div class="doc-shell">
+<div class="band">
+  <div class="wrap">
+    <div class="mark">domo.</div>
+    <div class="eyebrow">Construction Services Agreement</div>
+    <h1>Home Project Agreement</h1>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="card">
+    <div class="meta">
+      <div class="date">Prepared <span data-token="CONTRACT_DATE">August 13, 2026</span></div>
+      <div class="status" data-token="STATUS">Draft</div>
+    </div>
+
+    <h2>Parties</h2>
+    <div class="parties">
+      <div class="party">
+        <div class="role">Contractor</div>
+        <div class="name">Domo</div>
+        <div class="detail">
+          <span data-token="DOMO_LEGAL_NAME">Domo LLC</span><br>
+          <span data-token="DOMO_ADDRESS">[street address], San Juan, PR [zip]</span><br>
+          <span data-token="DOMO_PHONE">+1 787 419 0300</span> &middot; info@domoyourhome.com<br>
+          Merchant reg. <span data-token="DOMO_REG">[DACo / merchant registration no.]</span>
+        </div>
+      </div>
+      <div class="party">
+        <div class="role">Client</div>
+        <div class="name" data-token="CLIENT_NAME">[Client name]</div>
+        <div class="detail">
+          <span data-token="CLIENT_ADDRESS">[mailing address]</span><br>
+          <span data-token="CLIENT_PHONE">[phone / WhatsApp]</span><br>
+          <span data-token="CLIENT_EMAIL">[email]</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="propbox">
+      <div class="role">Property where the work will be performed</div>
+      <div class="addr" data-token="PROPERTY_ADDRESS">[street, unit, municipio, PR — full address required]</div>
+    </div>
+
+    <hr>
+
+    <h2>Scope of Work</h2>
+    <p>Domo will perform the work listed below at the property identified above. Quantities, brands, models and finishes are set out in
+      Quote <strong data-token="QUOTE_NUMBER">#Q-2026-0000</strong> dated <strong data-token="QUOTE_DATE">[quote date]</strong>, a copy of which is delivered with this agreement
+      and forms part of it. Where this agreement and the quote conflict, this agreement controls.</p>
+    <div class="scope">
+      <ol data-token="SCOPE_ITEMS">
+        <li>[Scope items appear here — enter one per line in the builder.]</li>
+      </ol>
+    </div>
+    <p class="fine" style="margin-top:14px">Finish standard: surfaces are delivered patched, plastered and ready for paint. Painting, priming and final finishes are included only where listed in the scope above or in the quote.</p>
+
+    <hr>
+
+    <h2>What Is Not Included</h2>
+    <p>Unless expressly listed in the scope of work above or in the quote, this agreement excludes: permits and government fees; architectural, engineering or design services;
+      hazardous-material testing or abatement (asbestos, mold, lead); structural repair or reinforcement; moving, storing or protecting the Client's furnishings and belongings;
+      appliances, fixtures and finishes supplied by the Client; painting and final finishes; work on concealed conditions not visible to a contractor on reasonable inspection at the time of quoting;
+      and any work not described in the scope.</p>
+
+    <hr>
+
+    <h2>Contract Price</h2>
+    <div class="total-row">
+      <div class="label">Total, including IVU</div>
+      <div class="amount" data-token="TOTAL">$0.00</div>
+    </div>
+    <p class="fine">Prices are in USD. This is a fixed price for the scope described. Puerto Rico sales and use tax (IVU) is included in the total shown above and in every rate stated in this agreement.
+      This price is open for acceptance for thirty (30) days from the date of the quote. Once signed, it changes only through an approved change order or the material-cost provision below.
+      Materials outside the described scope are billed separately at cost plus <span data-token="MATERIAL_MARKUP">15%</span>, with receipts.</p>
+
+    <h2>Payment Schedule</h2>
+    <p>Domo bills weekly for the work actually completed. Apart from the deposit, nothing is billed before the work it pays for is done.</p>
+    <div class="tablewrap">
+      <table class="pay">
+        <caption>Percentages are of the total contract price. Dollar figures are rounded to the cent.</caption>
+        <thead>
+          <tr><th scope="col">Stage</th><th scope="col">When</th><th scope="col" class="r">Amount</th></tr>
+        </thead>
+        <tbody>
+          <tr class="pay-now">
+            <td class="stage">Deposit &mdash; 25%</td>
+            <td>On signing. Reserves the crew and the start date, and is credited back to the Client against the earliest weekly invoices.</td>
+            <td class="amt r" data-token="DEPOSIT">$0.00</td>
+          </tr>
+          <tr>
+            <td class="stage">Weekly progress</td>
+            <td>Every <span data-token="INVOICE_DAY">Friday</span>, for the work completed that week, valued at the line-item prices in the quote. Each invoice lists what was completed.</td>
+            <td class="amt r">as completed</td>
+          </tr>
+          <tr>
+            <td class="stage">Final &mdash; 15%</td>
+            <td>At substantial completion and walkthrough, as described under Completion &amp; Walkthrough below.</td>
+            <td class="amt r" data-token="FINAL">$0.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine"><strong>How the weekly billing works.</strong> Each weekly invoice covers only work already performed and materials already delivered to the site, priced from the line items in the quote.
+      The deposit is applied as a credit against the earliest weekly invoices until it is used up, so the Client pays nothing further until the work has caught up to the deposit.
+      Total billing before substantial completion &mdash; deposit and weekly invoices combined &mdash; will not exceed 85% of the contract price. The remaining 15% is billed only at the walkthrough.</p>
+    <p class="fine">Weekly invoices are due within five (5) calendar days. The final payment is due as described under Completion &amp; Walkthrough.
+      Amounts unpaid more than ten (10) calendar days after their due date carry a late charge of 1.5% per month on the overdue amount.
+      Domo owes the Client the same 1.5% per month on any amount it is required to refund and does not refund on time.
+      If an invoice is more than ten (10) calendar days overdue, Domo may suspend work on written notice until it is paid; the schedule then extends by the length of the suspension plus two (2) working days to remobilize,
+      and no separate remobilization fee applies to a suspension for non-payment. Paying an invoice is not acceptance of the work and does not waive the warranty.
+      If the Client disputes an item on a weekly invoice, the Client pays the undisputed part on time and raises the disputed item in writing within those five (5) days.</p>
+
+    <hr>
+
+    <h2>Schedule</h2>
+    <div class="dates">
+      <div>
+        <div class="role">Start date</div>
+        <div class="val" data-token="TARGET_START">[required — must be filled before signing]</div>
+      </div>
+      <div>
+        <div class="role">Substantial completion by</div>
+        <div class="val" data-token="TARGET_FINISH">[required — must be filled before signing]</div>
+      </div>
+    </div>
+    <p>Domo commits to these dates, subject only to the extensions described next. They extend, without penalty to either party, by the time actually lost to approved change orders, concealed conditions, permit delays,
+      material shortages, Client-caused delays, and events beyond Domo's reasonable control including severe weather, hurricane warnings, utility interruptions, strikes and government action.
+      Domo will notify the Client in writing when any of these arises and state the expected extension.</p>
+    <p>If the Client suspends the work, or delays access, a decision or a selection, by more than five (5) working days, Domo may charge a remobilization fee of
+      <strong data-token="REMOB_FEE">$450</strong> on written notice given before the charge is incurred.</p>
+
+    <hr>
+
+    <h2>Completion &amp; Walkthrough</h2>
+    <p>The work is <strong>substantially complete</strong> when the scope has been performed and the affected areas can be used for their intended purpose. Minor items may remain &mdash;
+      meaning items that do not prevent that use and can be corrected without significant disruption.</p>
+    <p>Domo notifies the Client and the parties walk the work together on a date agreed between them, within five (5) working days of the notice. At the walkthrough they record one written
+      punch list of anything that does not meet the scope. The final payment is due at the walkthrough, except that the Client may hold back the reasonable cost of the punch items &mdash;
+      priced by agreement, or by a third-party estimate if the parties cannot agree &mdash; and releases that holdback within three (3) working days of those items being corrected.
+      Domo will correct punch items within ten (10) working days unless a part or trade requires longer.</p>
+    <p>As a backstop only: if fifteen (15) working days pass from Domo's notice without a walkthrough taking place for reasons within the Client's control, and the Client has not given Domo a written list of objections in that time,
+      the work is treated as substantially complete and the final payment becomes due &mdash; but the Client's punch-list holdback right and the warranty both survive.
+      Using the finished rooms is not, by itself, acceptance of the work.</p>
+
+    <hr>
+
+    <h2>Changes to the Work</h2>
+    <p>Any change to the scope, materials, price or schedule must be approved in writing before the additional work begins. Email or WhatsApp is fine &mdash;
+      a written approval sent from the Client's email address or phone number listed in the Parties section counts as a signature.</p>
+    <p>Unless a fixed price is agreed for the change, additional work is billed at <strong data-token="HOURLY_RATE">$65</strong> per worker-hour including IVU, plus materials at cost plus
+      <span data-token="MATERIAL_MARKUP">15%</span>. Approved changes adjust the total price and the dates above. Domo is not obligated to perform work that has not been approved in writing.</p>
+
+    <hr>
+
+    <h2>Concealed &amp; Structural Conditions</h2>
+    <p>The scope and price are based on what was visible at the time of quoting. Except where the scope or quote says otherwise, all walls, ceilings and openings in the scope are assumed to be
+      <strong>non-structural and non-load-bearing</strong>, based on visual inspection only.</p>
+    <p>If Domo encounters a concealed condition &mdash; hidden piping or wiring, water damage, termite or structural damage, unpermitted prior work, or suspected hazardous material &mdash;
+      or if any element proves to be load-bearing, Domo stops work in that area, notifies the Client within twenty-four (24) hours with photographs, and prices the additional work as a change order.
+      Structural repair, engineering and hazardous-material abatement are outside this agreement unless the scope or quote includes them, and are the Client's to authorize and pay for.
+      If the Client does not decide within five (5) working days of the notice, the schedule extends by the delay and the remobilization fee under Schedule may apply.</p>
+
+    <hr>
+
+    <h2>Permits &amp; Licenses</h2>
+    <p>Permits and government fees are the Client's responsibility and are not included in the price. At the Client's written request, Domo will obtain permits as the Client's agent,
+      and the Client reimburses the actual fees plus a handling charge of <strong data-token="PERMIT_FEE">$150</strong> per permit.
+      The Client confirms it owns the property or has authority to permit the work, and will obtain any homeowner-association, condominium or landlord approvals required.
+      Neither party is responsible for delays caused by permitting authorities or associations.</p>
+
+    <hr>
+
+    <h2>Materials, Title &amp; Risk of Loss</h2>
+    <p>Principal materials &mdash; with brand, model, color and specification where applicable &mdash; are listed in the quote delivered with this agreement.
+      Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Where a specified item is unavailable or discontinued,
+      Domo notifies the Client and may substitute an item of equal or better quality and specification.</p>
+    <p>Title and risk of loss for materials pass to the Client on delivery to the site or on payment, whichever is earlier &mdash;
+      <strong>except that Domo remains responsible for loss or damage caused by Domo, its employees or its subcontractors.</strong>
+      Domo will store materials reasonably at the site. The Client's property insurance covers materials on site against theft, fire and weather.</p>
+    <p>A material price increase adjusts the price only where it exceeds 10% of that item's quoted cost, arises after a Client-caused delay of more than ten (10) working days in signing,
+      selection or ordering, and is shown to the Client with supplier documentation before the material is ordered.</p>
+
+    <hr>
+
+    <h2>Site Access &amp; Client Responsibilities</h2>
+    <p>Domo works from 7:00 a.m. to 3:00 p.m., Monday through Friday. Where finishing a task in progress would avoid leaving the area unsafe or unusable overnight, Domo may stay
+      until 5:00 p.m. at no extra charge to the Client. The Client provides safe, unobstructed access from 7:00 a.m. to 5:00 p.m. on working days, along with water and electricity
+      at the site at no charge to Domo. Saturday and evening work is by agreement.</p>
+    <p>Before the start date the Client clears the work area of furniture, belongings and anything fragile or valuable, and discloses in writing any condition it knows of
+      behind the walls or under the floors. Domo is not responsible for pre-existing conditions, for damage to items the Client failed to remove after being asked,
+      or for ordinary dust and vibration inherent in demolition work. This does not excuse damage caused by Domo's own negligence.</p>
+    <p>Where the Client supplies appliances, fixtures or finishes, they must be on site and complete before the week in which they are needed.
+      Material and color selections are due at least five (5) working days before they are needed.</p>
+
+    <hr>
+
+    <h2>Subcontractors &amp; Insurance</h2>
+    <p>Domo may perform the work through its own personnel or through qualified subcontractors, and remains responsible to the Client for all of the work either way.</p>
+    <p>Domo carries commercial general liability insurance, maintains workers' compensation coverage (CFSE) as required by Puerto Rico law, and requires each subcontractor on this project
+      to carry its own coverage or to be covered under Domo's. Certificates are available on request. Domo indemnifies the Client against any claim by a Domo worker or subcontractor
+      for injury on this project. The Client maintains its own property and homeowner's insurance in force throughout the work.</p>
+
+    <hr>
+
+    <h2>Cleanup</h2>
+    <p>Domo removes its debris and leaves the work area in broom-clean condition &mdash; swept, with construction debris, packaging and offcuts removed from the property &mdash; at completion.
+      Disposal of construction debris is included where listed in the scope; otherwise it is billed at cost. Final detailed cleaning and painting-grade dust removal are not included.</p>
+
+    <hr>
+
+    <h2>Workmanship Warranty</h2>
+    <p>Domo stands behind its work. For <strong>one (1) year</strong> from substantial completion, Domo will correct at no charge any part of the completed work that fails
+      because of defective workmanship &mdash; electrical connections, plumbing connections, block and structural-adjacent work, and anything that stops functioning as intended.</p>
+    <p>Cosmetic and finish items are covered for <strong>ninety (90) days</strong>: plaster and joint cracking, nail pops, minor settlement movement, and surface finish.
+      These are the things a building does on its own as it settles, and ninety days is enough to show a real defect.</p>
+    <p>Materials, appliances and fixtures carry the manufacturer's warranty, which Domo passes through to the Client.</p>
+    <p>Neither warranty covers damage from misuse, neglect, normal wear, moisture or weather, alterations or repairs by others, Client-supplied materials,
+      or work Domo was directed to perform over its own written recommendation. Cracking, nail pops and movement that appear after the ninety-day cosmetic period are treated as normal settlement and are not covered.
+      Notify Domo in writing within the applicable period and allow reasonable access to inspect and correct.</p>
+    <p><strong>This warranty is in addition to, and does not replace or limit, any right the Client has under Puerto Rico law</strong>, including the warranty against hidden defects
+      and the builder's liability for a structure under the Civil Code.</p>
+
+    <hr>
+
+    <h2>Responsibility &amp; Limitation of Liability</h2>
+    <p>Each party is responsible for its own negligence and will indemnify the other against third-party claims arising from its own negligent acts or omissions in connection with the work.</p>
+    <div class="flag">
+      <p><strong>Please read this section. It limits what you can recover from Domo.</strong></p>
+      <p><strong>The limit.</strong> Except for the four things listed next, the most Domo can be required to pay under this agreement is the contract price.</p>
+      <p><strong>What the limit does not apply to.</strong> Claims covered by Domo's general liability insurance, which responds up to its own policy limits;
+        injury to a person; damage caused by Domo's gross negligence or willful misconduct; and Domo's indemnity obligations under the first paragraph of this section.</p>
+      <p><strong>Knock-on losses.</strong> Neither party pays the other for losses that follow from a problem rather than being the problem itself &mdash;
+        lost rental or business income, loss of use of the property, or a drop in property value.</p>
+      <p><strong>Puerto Rico law comes first.</strong> Nothing in this agreement limits a right or a liability that Puerto Rico law does not allow to be limited or waived.</p>
+    </div>
+
+    <hr>
+
+    <h2>Cancellation &amp; Termination</h2>
+    <div class="flag">
+      <p><strong>Your right to cancel.</strong> If the Client signed this agreement somewhere other than Domo's place of business, the Client may cancel it without cost, penalty or obligation
+        within three (3) business days of signing, by sending written notice to Domo at the mailing address or email address in the Parties section, or by using the Notice of Cancellation form
+        delivered with this agreement. On a timely cancellation Domo refunds the full deposit within ten (10) days and Domo bears the cost of anything it chose to order during those three days.</p>
+    </div>
+    <p><strong>Cancellation after the three-day period, before work begins.</strong> The Client may still cancel. Domo retains only its documented costs actually incurred &mdash;
+      scheduling, evaluation, and non-returnable materials already ordered &mdash; and refunds the rest of the deposit within ten (10) days, with receipts.</p>
+    <p><strong>Ending the agreement once work has begun.</strong> The Client may end this agreement at any time on written notice, and pays for the work performed and materials supplied
+      through that date, plus any non-cancellable commitments, plus Domo's documented direct costs of demobilizing. Domo may end this agreement on written notice if the property is unsafe
+      or if a condition makes the work impracticable, and refunds anything paid for work not performed.</p>
+    <p><strong>Default.</strong> Either party may terminate for material breach if the breach is not cured within ten (10) calendar days of written notice. Non-payment is a material breach.
+      If Domo is the party in default, the Client may terminate, recover any amount paid for work not performed, and recover the reasonable additional cost of having another contractor
+      complete the scope, up to the unpaid balance of the contract price.</p>
+
+    <hr>
+
+    <h2>Liens</h2>
+    <p>Domo and its suppliers retain any lien rights provided by Puerto Rico law until paid in full. On final payment, Domo provides a written release of lien rights for the work covered by that payment.</p>
+
+    <hr>
+
+    <h2>Notices</h2>
+    <p>Notices of breach, suspension or termination must be in writing and sent by email &mdash; to Domo at <strong>info@domoyourhome.com</strong>, and to the Client at the email address
+      in the Parties section. An emailed notice is effective when sent. Each party keeps its email address current and tells the other in writing if it changes.
+      A notice to cancel under the three-day right described above may also be sent by mail to Domo's address in the Parties section.
+      Day-to-day communication and change-order approvals may be by email or WhatsApp.</p>
+
+    <hr>
+
+    <h2>General</h2>
+    <p>Domo performs as an independent contractor, not an employee or partner of the Client. This agreement, together with the quote delivered with it and any approved change orders,
+      is the entire agreement between the parties and supersedes prior discussions, proposals and estimates. Neither party may assign this agreement without the other's written consent,
+      which will not be unreasonably withheld. If any provision is unenforceable, the remainder stays in effect and the unenforceable provision is applied to the fullest extent the law allows.
+      This agreement may be signed electronically, and an electronic signature has the same effect as a handwritten one.</p>
+    <p>This agreement is governed by the laws of the Commonwealth of Puerto Rico. The parties will first try to resolve any dispute in good faith directly, within fifteen (15) days of written
+      notice of the dispute. Unresolved disputes go to the Court of First Instance, San Juan Judicial Region. The prevailing party in an action to enforce this agreement is entitled to its
+      reasonable attorney's fees and costs. Nothing here prevents either party from bringing a claim before the Puerto Rico Department of Consumer Affairs (DACo).</p>
+  </div>
+
+  <form class="sign" data-domo-sign>
+    <h2>Sign to Accept</h2>
+    <p class="lead">By signing, you agree to the scope, price, payment schedule and terms above.</p>
+
+    <label class="field-label" for="signName">Your full name</label>
+    <input class="field" id="signName" name="signer" type="text" autocomplete="name" placeholder="Type your full name">
+
+    <div class="field-label" id="siglabel">Signature</div>
+    <canvas class="padbox" id="pad" aria-labelledby="siglabel"></canvas>
+    <div class="padhint" id="padhint">Draw your signature here</div>
+    <a class="clear" data-domo-clear role="button" tabindex="0">Clear signature</a>
+
+    <div class="signed-stamp" id="stamp">
+      <img id="stampImg" alt="Client signature">
+      <div class="when" id="stampWhen"></div>
+    </div>
+
+    <div class="check">
+      <input type="checkbox" id="agree" name="agree" required>
+      <label for="agree">I have read and agree to this Service Agreement, including the payment schedule and the limitation of liability, and understand a deposit of
+        <strong data-token="DEPOSIT">$0.00</strong> is due to schedule the work.</label>
+    </div>
+
+    <div class="check">
+      <input type="checkbox" id="cancelright" name="cancelright" required>
+      <label for="cancelright">I have received a copy of this agreement, the attached quote, and the Notice of Cancellation explaining my right to cancel within three business days.</label>
+    </div>
+
+    <div class="check">
+      <input type="checkbox" id="photos" name="photos">
+      <label for="photos"><em>Optional.</em> Domo may photograph the finished work for its portfolio, without showing my name, address or belongings. I can withdraw this at any time
+        and Domo will stop using the images going forward.</label>
+    </div>
+
+    <button class="btn" type="submit">Sign agreement</button>
+    <p class="secure">domo &middot; secure electronic signature</p>
+
+    <!-- Wet-signature block: only prints when not e-signed -->
+    <div class="print-sign">
+      <div class="cols">
+        <div><div class="ln"></div><div class="cap">Client signature &middot; <span data-token="CLIENT_NAME">[Client name]</span> &middot; Date</div></div>
+        <div><div class="ln"></div><div class="cap">For Domo &middot; <span data-token="DOMO_SIGNER">Néstor Nadal, Domo</span> &middot; Date</div></div>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="parties">
+      <div class="party">
+        <div class="role">Client</div>
+        <div class="sigline"><span data-token="CLIENT_NAME">[Client name]</span> &middot; Date</div>
+      </div>
+      <div class="party">
+        <div class="role">For Domo</div>
+        <div class="sigline"><span data-token="DOMO_SIGNER">Néstor Nadal, Domo</span> &middot; Date</div>
+      </div>
+    </div>
+  </form>
+
+  <footer>
+    domo &middot; <span data-token="DOMO_PHONE">+1 787 419 0300</span> &middot; info@domoyourhome.com &middot; <a href="https://www.domoyourhome.com">www.domoyourhome.com</a>
+    <div class="disclaim">This is a general construction services contract and not legal advice. Terms should be reviewed by qualified Puerto Rico counsel before use.</div>
+  </footer>
+</main>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mpgljurndbfusxtcrogr.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_eSqiIIUFZck9XFdpgE3Ctg_u3-lBI88';
+const LS_KEY = 'domo_contract_draft_v1';
+
+const $ = s => document.querySelector(s);
+const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtUSD = n => '$' + (n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function fmtDate(iso){
+  if(!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+}
+function setToken(tok, val){
+  document.querySelectorAll('[data-token="'+tok+'"]').forEach(el=>{
+    if(el.tagName==='INPUT') el.value = val; else el.textContent = val;
+  });
+}
+
+// field id -> token (plain text bindings)
+const BIND = {
+  f_status:'STATUS', f_domoLegal:'DOMO_LEGAL_NAME', f_domoAddr:'DOMO_ADDRESS',
+  f_domoPhone:'DOMO_PHONE', f_domoReg:'DOMO_REG', f_domoSigner:'DOMO_SIGNER',
+  f_clientName:'CLIENT_NAME', f_clientAddr:'CLIENT_ADDRESS', f_clientPhone:'CLIENT_PHONE',
+  f_clientEmail:'CLIENT_EMAIL', f_property:'PROPERTY_ADDRESS', f_quoteNumber:'QUOTE_NUMBER',
+  f_markup:'MATERIAL_MARKUP', f_hourly:'HOURLY_RATE', f_remob:'REMOB_FEE',
+  f_permit:'PERMIT_FEE', f_invoiceDay:'INVOICE_DAY',
+};
+const DATE_BIND = { f_contractDate:'CONTRACT_DATE', f_quoteDate:'QUOTE_DATE', f_start:'TARGET_START', f_finish:'TARGET_FINISH' };
+
+function applyField(id){
+  const el = document.getElementById(id); if(!el) return;
+  if(BIND[id]){ const v = el.value.trim(); setToken(BIND[id], v || defaultFor(BIND[id])); }
+  else if(DATE_BIND[id]){ const v = el.value ? fmtDate(el.value) : defaultFor(DATE_BIND[id]); setToken(DATE_BIND[id], v); }
+  else if(id==='f_total') applyTotal();
+  else if(id==='f_scope') applyScope();
+}
+function defaultFor(tok){
+  const d = {
+    STATUS:'Draft', DOMO_LEGAL_NAME:'Domo LLC', DOMO_ADDRESS:'[street address], San Juan, PR [zip]',
+    DOMO_PHONE:'+1 787 419 0300', DOMO_REG:'[DACo / merchant registration no.]', DOMO_SIGNER:'Néstor Nadal, Domo',
+    CLIENT_NAME:'[Client name]', CLIENT_ADDRESS:'[mailing address]', CLIENT_PHONE:'[phone / WhatsApp]', CLIENT_EMAIL:'[email]',
+    PROPERTY_ADDRESS:'[street, unit, municipio, PR — full address required]', QUOTE_NUMBER:'#Q-2026-0000',
+    QUOTE_DATE:'[quote date]', CONTRACT_DATE:'[date]', TARGET_START:'[required — must be filled before signing]',
+    TARGET_FINISH:'[required — must be filled before signing]', MATERIAL_MARKUP:'15%', HOURLY_RATE:'$65',
+    REMOB_FEE:'$450', PERMIT_FEE:'$150', INVOICE_DAY:'Friday',
+  };
+  return d[tok] || '';
+}
+function applyTotal(){
+  const raw = document.getElementById('f_total').value.replace(/[^0-9.]/g,'');
+  const n = parseFloat(raw) || 0;
+  setToken('TOTAL', fmtUSD(n));
+  setToken('DEPOSIT', fmtUSD(n*0.25));
+  setToken('FINAL', fmtUSD(n*0.15));
+  document.getElementById('computed').textContent =
+    n>0 ? `Depósito ${fmtUSD(n*0.25)} · Final ${fmtUSD(n*0.15)} · Semanal ${fmtUSD(n*0.60)}` : 'Depósito 25% y final 15% se calculan solos.';
+}
+function applyScope(){
+  const lines = document.getElementById('f_scope').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const ol = document.querySelector('[data-token="SCOPE_ITEMS"]');
+  ol.innerHTML = lines.length ? lines.map(t=>'<li>'+esc(t)+'</li>').join('')
+    : '<li>[Scope items appear here — enter one per line in the builder.]</li>';
+}
+
+function applyAll(){ Object.keys(BIND).forEach(applyField); Object.keys(DATE_BIND).forEach(applyField); applyTotal(); applyScope(); validate(); save(); }
+
+function validate(){
+  const checks = [['f_property','wrap_property'],['f_start','wrap_start'],['f_finish','wrap_finish']];
+  const missing = [];
+  checks.forEach(([id,wrap])=>{
+    const el = document.getElementById(id);
+    const bad = !el.value.trim();
+    document.getElementById(wrap).classList.toggle('invalid', bad);
+    if(bad) missing.push(id);
+  });
+  if(!document.getElementById('f_clientName').value.trim()) missing.push('client');
+  if(!document.getElementById('f_total').value.trim()) missing.push('total');
+  const warn = document.getElementById('warn');
+  if(missing.length){
+    warn.classList.add('show');
+    warn.textContent = 'Faltan campos requeridos antes de firmar: ' +
+      (missing.includes('f_property')?'dirección de la obra · ':'') +
+      (missing.includes('f_start')||missing.includes('f_finish')?'fechas de inicio/fin · ':'') +
+      (missing.includes('client')?'nombre del cliente · ':'') +
+      (missing.includes('total')?'total · ':'');
+    warn.textContent = warn.textContent.replace(/ · $/,'.');
+  } else { warn.classList.remove('show'); }
+  return missing.length===0;
+}
+
+// ---- persistence ----
+const ALL_IDS = [...Object.keys(BIND), ...Object.keys(DATE_BIND), 'f_total', 'f_scope'];
+function save(){
+  const data = {}; ALL_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) data[id]=el.value; });
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(data)); }catch(e){}
+}
+function restore(){
+  let data = {};
+  try{ data = JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch(e){}
+  ALL_IDS.forEach(id=>{ if(data[id]!=null){ const el=document.getElementById(id); if(el) el.value=data[id]; } });
+}
+
+// ---- wire inputs ----
+ALL_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input', ()=>{ applyField(id); validate(); save(); }); });
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('¿Borrar este contrato y empezar de cero?')) return;
+  try{ localStorage.removeItem(LS_KEY); }catch(e){}
+  ALL_IDS.forEach(id=>{ const el=document.getElementById(id); if(el && !['f_domoPhone','f_domoSigner','f_markup','f_hourly','f_remob','f_permit','f_invoiceDay','f_status'].includes(id)) el.value=''; });
+  document.body.classList.remove('signed');
+  applyAll();
+});
+
+document.getElementById('printBtn').addEventListener('click', ()=>{
+  if(!validate()){ document.getElementById('builder').scrollTop=0; alert('Completa los campos requeridos (marcados en rojo) antes de descargar.'); return; }
+  window.print();
+});
+
+// ---- panel toggle ----
+const toggle = document.getElementById('toggle');
+function setPanel(open){ document.body.classList.toggle('panel-open', open); toggle.textContent = open ? '✕ Cerrar' : '☰ Editar'; }
+toggle.addEventListener('click', ()=> setPanel(!document.body.classList.contains('panel-open')));
+
+// ---- quote prefill ----
+document.getElementById('loadBtn').addEventListener('click', loadQuote);
+document.getElementById('loadQ').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); loadQuote(); } });
+async function loadQuote(){
+  const qnum = document.getElementById('loadQ').value.trim();
+  if(!qnum) return;
+  const btn = document.getElementById('loadBtn'); const orig = btn.textContent; btn.textContent='…'; btn.disabled=true;
+  try{
+    const h = { apikey:SUPABASE_ANON, Authorization:'Bearer '+SUPABASE_ANON };
+    const qr = await fetch(`${SUPABASE_URL}/rest/v1/quotes?quote_number=eq.${encodeURIComponent(qnum)}&select=id,quote_number,client_name,client_email,client_phone,client_property,scope,grand_total,created_at&limit=1`, {headers:h});
+    const rows = await qr.json();
+    if(!rows.length){ alert('No encontré la cotización '+qnum+'.'); return; }
+    const q = rows[0];
+    const set=(id,v)=>{ const el=document.getElementById(id); if(el && v!=null && v!=='') el.value=v; };
+    set('f_clientName', q.client_name);
+    set('f_clientEmail', q.client_email);
+    set('f_clientPhone', q.client_phone);
+    set('f_property', q.client_property);
+    set('f_quoteNumber', q.quote_number);
+    if(q.created_at) set('f_quoteDate', q.created_at.slice(0,10));
+    if(q.grand_total!=null) set('f_total', String(q.grand_total));
+    // scope: prefer labor line items, else the quote's scope text
+    let scopeLines = [];
+    try{
+      const lr = await fetch(`${SUPABASE_URL}/rest/v1/quote_line_items?quote_id=eq.${q.id}&select=description,category,sort_order&order=sort_order`, {headers:h});
+      const items = await lr.json();
+      scopeLines = (items||[]).filter(i=>i.category==='labor' && i.description).map(i=>i.description);
+    }catch(e){}
+    if(!scopeLines.length && q.scope) scopeLines = q.scope.split('\n').map(s=>s.trim()).filter(Boolean);
+    if(scopeLines.length) document.getElementById('f_scope').value = scopeLines.join('\n');
+    applyAll();
+    alert('Cargado de '+q.quote_number+'. Revisa y completa dirección de obra y fechas.');
+  }catch(e){
+    alert('No pude cargar la cotización (conexión). Puedes llenar los campos a mano.');
+  }finally{ btn.textContent=orig; btn.disabled=false; }
+}
+
+// ---- signature pad ----
+const pad = document.getElementById('pad');
+let ctx, drawing=false, hasInk=false;
+function sizePad(){
+  const r = pad.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  pad.width = r.width*dpr; pad.height = r.height*dpr;
+  ctx = pad.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.lineWidth=2.2; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#16233f';
+}
+function posOf(e){ const r=pad.getBoundingClientRect(); const p=e.touches?e.touches[0]:e; return {x:p.clientX-r.left, y:p.clientY-r.top}; }
+function start(e){ e.preventDefault(); drawing=true; const p=posOf(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+function move(e){ if(!drawing) return; e.preventDefault(); const p=posOf(e); ctx.lineTo(p.x,p.y); ctx.stroke(); hasInk=true; document.getElementById('padhint').style.display='none'; }
+function end(){ drawing=false; }
+pad.addEventListener('mousedown',start); pad.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+pad.addEventListener('touchstart',start,{passive:false}); pad.addEventListener('touchmove',move,{passive:false}); pad.addEventListener('touchend',end);
+document.querySelector('[data-domo-clear]').addEventListener('click', ()=>{ ctx.clearRect(0,0,pad.width,pad.height); hasInk=false; document.getElementById('padhint').style.display=''; });
+
+// ---- e-sign submit ----
+document.querySelector('[data-domo-sign]').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  if(!validate()){ alert('El contrato tiene campos requeridos sin llenar. Complétalos antes de firmar.'); return; }
+  const name = document.getElementById('signName').value.trim();
+  if(!name){ alert('Escribe tu nombre completo.'); return; }
+  if(!document.getElementById('agree').checked || !document.getElementById('cancelright').checked){ alert('Debes marcar las dos casillas de aceptación.'); return; }
+  if(!hasInk){ alert('Dibuja tu firma en el recuadro.'); return; }
+  const when = new Date().toLocaleString('en-US',{dateStyle:'long',timeStyle:'short'});
+  document.getElementById('stampImg').src = pad.toDataURL('image/png');
+  document.getElementById('stampWhen').textContent = 'Signed by '+name+' · '+when;
+  document.body.classList.add('signed');
+  setToken('STATUS','Signed'); document.getElementById('f_status').value='Final'; applyField('f_status');
+  setTimeout(()=>{ if(confirm('Firmado. ¿Descargar / guardar el PDF ahora?')) window.print(); }, 150);
+});
+
+// ---- init ----
+restore();
+// sensible defaults on first use
+if(!document.getElementById('f_contractDate').value){
+  const t = new Date(); document.getElementById('f_contractDate').value = t.toISOString().slice(0,10);
+}
+sizePad(); window.addEventListener('resize', ()=>{ /* keep signature; only resize if empty */ if(!hasInk) sizePad(); });
+applyAll();
+if(window.innerWidth > 1000) setPanel(true); else setPanel(false);
+</script>
+</body>
+</html>
