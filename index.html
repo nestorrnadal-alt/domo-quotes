@@ -840,6 +840,10 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
       <div class="form-group"><label class="form-label">Fecha de terminación (est.)</label><input class="form-input" type="date" id="cm-completion" /></div>
     </div>
     <div class="form-row">
+      <label class="include-check" style="align-items:flex-start;"><input type="checkbox" id="cm-hard-deadline" />
+        <span>Fecha de entrega <b>firme</b> (hard deadline) — el contrato indicará que Domo se compromete a esa fecha, salvo las extensiones listadas.</span></label>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label class="form-label">Calendario de pago (aparece en el contrato, en inglés)</label><textarea class="form-textarea" id="cm-terms" rows="3"></textarea></div>
     </div>
     <div style="font-size:12px;color:var(--mid);margin-bottom:12px;">El alcance se toma de la cotización. Garantía, cambios y cancelación usan los términos estándar de Domo (en inglés). Después de generar, copia el enlace de firma para enviárselo al cliente.</div>
@@ -2003,6 +2007,7 @@ async function generateContract() {
   const deposit = roundedDeposit(total, pct);
   const startDate = document.getElementById('cm-start').value || null;
   const completionDate = document.getElementById('cm-completion').value || null;
+  const hardDeadline = document.getElementById('cm-hard-deadline').checked === true;
   const terms = (document.getElementById('cm-terms').value || '').trim();
   const btn = document.getElementById('cm-generate-btn');
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generando...';
@@ -2016,7 +2021,7 @@ async function generateContract() {
       project_id: pid, quote_id: p.primary_quote_id || null,
       client_name: p.client_name, client_email: p.client_email, client_property: p.client_property,
       scope, contract_total: total, deposit_amount: deposit, deposit_percent: pct,
-      start_date: startDate, completion_date: completionDate,
+      start_date: startDate, completion_date: completionDate, hard_deadline: hardDeadline,
       payment_terms: terms || null,
       guarantee_terms: CONTRACT_DEFAULT_TERMS.guarantee,
       change_order_terms: CONTRACT_DEFAULT_TERMS.change_order,
