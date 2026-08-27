@@ -829,11 +829,18 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
     <div class="modal-title">Generar contrato</div>
     <input type="hidden" id="cm-project-id" />
     <div class="form-row cols-2">
-      <div class="form-group"><label class="form-label">Total del contrato ($)</label><input class="form-input" type="number" id="cm-total" oninput="cmRecompute()" /></div>
+      <div class="form-group"><label class="form-label">Subtotal — sin IVU ($)</label><input class="form-input" type="number" id="cm-total" oninput="cmRecompute()" /></div>
       <div class="form-group"><label class="form-label">Depósito %</label><input class="form-input" type="number" id="cm-deposit-pct" value="25" min="0" max="100" oninput="cmRecompute()" /></div>
     </div>
+    <div class="form-row cols-2">
+      <div class="form-group"><label class="form-label">IVU %</label><input class="form-input" type="number" id="cm-iva" value="11.5" step="0.1" min="0" oninput="cmRecompute()" /></div>
+      <div class="form-group"><label class="form-label">Total con IVU</label><input class="form-input" id="cm-total-display" readonly style="background:var(--cream);font-weight:700;" /></div>
+    </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Depósito a cobrar</label><input class="form-input" id="cm-deposit-display" readonly style="background:var(--cream);font-weight:700;" /></div>
+      <label class="include-check"><input type="checkbox" id="cm-iva-applies" checked onchange="cmRecompute()" /> <span>Aplicar IVU sobre el subtotal (el contrato muestra Subtotal + IVU + Total).</span></label>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Depósito a cobrar (sobre el total con IVU)</label><input class="form-input" id="cm-deposit-display" readonly style="background:var(--cream);font-weight:700;" /></div>
     </div>
     <div class="form-row cols-2">
       <div class="form-group"><label class="form-label">Fecha de inicio (est.)</label><input class="form-input" type="date" id="cm-start" /></div>
@@ -844,9 +851,9 @@ body { font-family: 'Epilogue', sans-serif; background: var(--off-white); color:
         <span>Fecha de entrega <b>firme</b> (hard deadline) — el contrato indicará que Domo se compromete a esa fecha, salvo las extensiones listadas.</span></label>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Calendario de pago (aparece en el contrato, en inglés)</label><textarea class="form-textarea" id="cm-terms" rows="3"></textarea></div>
+      <div class="form-group"><label class="form-label">Calendario de pago — opcional (vacío = usa el estándar de Domo)</label><textarea class="form-textarea" id="cm-terms" rows="3" placeholder="Déjalo vacío para usar el calendario de pago estándar (depósito, facturas semanales, 10% final en el walkthrough)."></textarea></div>
     </div>
-    <div style="font-size:12px;color:var(--mid);margin-bottom:12px;">El alcance se toma de la cotización. Garantía, cambios y cancelación usan los términos estándar de Domo (en inglés). Después de generar, copia el enlace de firma para enviárselo al cliente.</div>
+    <div style="font-size:12px;color:var(--mid);margin-bottom:12px;">El alcance se toma de la cotización. Pago, garantía, cambios y cancelación usan los términos estándar de Domo (en inglés) salvo que escribas un calendario de pago arriba. Después de generar, copia el enlace de firma para enviárselo al cliente.</div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('contract-modal')">Cancelar</button>
       <button class="btn btn-amber" onclick="generateContract()" id="cm-generate-btn">Generar contrato</button>
@@ -1967,19 +1974,21 @@ const CONTRACT_DEFAULT_TERMS = {
 // Deposit rounded to the nearest $50 for a clean number on the contract.
 function roundedDeposit(total, pct) { return Math.round((total * pct / 100) / 50) * 50; }
 
-function cmRecompute() {
-  const total = parseFloat(document.getElementById('cm-total').value) || 0;
+function cmComputeTotals() {
+  const subtotal = parseFloat(document.getElementById('cm-total').value) || 0;
   const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
-  const deposit = roundedDeposit(total, pct);
-  const balance = Math.max(0, total - deposit);
+  const ivaApplies = document.getElementById('cm-iva-applies').checked === true;
+  const ivaRate = (parseFloat(document.getElementById('cm-iva').value) || 0) / 100;
+  const iva = ivaApplies ? subtotal * ivaRate : 0;
+  const total = subtotal + iva;
+  const deposit = roundedDeposit(total, pct);   // deposit is a % of the IVU-inclusive total
+  return { subtotal, pct, ivaApplies, ivaRate, iva, total, deposit };
+}
+function cmRecompute() {
+  const t = cmComputeTotals();
   const f2 = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  document.getElementById('cm-deposit-display').value = f2(deposit);
-  const terms = document.getElementById('cm-terms');
-  if (terms && !terms.dataset.touched) {
-    terms.value = deposit > 0
-      ? `A deposit of ${f2(deposit)} (~${pct}%) is due on signing to schedule the work. The remaining ${f2(balance)} is billed in progress as the work advances; each progress invoice is due within 15 days of its invoice date. Balances unpaid after 15 days accrue interest at 1.5% per month.`
-      : `Work is billed in progress as it advances; each invoice is due within 15 days of its invoice date. Late balances accrue interest at 1.5% per month.`;
-  }
+  document.getElementById('cm-total-display').value = f2(t.total);
+  document.getElementById('cm-deposit-display').value = f2(t.deposit);
 }
 
 function openContractModal(projectId) {
@@ -1989,9 +1998,9 @@ function openContractModal(projectId) {
   document.getElementById('cm-project-id').value = projectId;
   document.getElementById('cm-total').value = (p.budget_total != null ? p.budget_total : '');
   document.getElementById('cm-deposit-pct').value = '25';
-  const terms = document.getElementById('cm-terms');
-  terms.value = ''; delete terms.dataset.touched;
-  terms.oninput = () => { terms.dataset.touched = '1'; };
+  document.getElementById('cm-iva').value = '11.5';
+  document.getElementById('cm-iva-applies').checked = true;
+  document.getElementById('cm-terms').value = ''; // blank = built-in standard schedule
   cmRecompute();
   document.getElementById('contract-modal').classList.add('open');
 }
@@ -2000,11 +2009,9 @@ async function generateContract() {
   const pid = document.getElementById('cm-project-id').value;
   const p = projectsCache.find(x => x.id === pid);
   if (!p) return;
-  const total = parseFloat(document.getElementById('cm-total').value) || 0;
-  const pct = parseFloat(document.getElementById('cm-deposit-pct').value) || 0;
+  const T = cmComputeTotals();
   // Deposits over 30% are unusually high for residential remodeling — guard against typos.
-  if (pct > 30 && !confirm('Un depósito mayor de 30% es inusualmente alto para remodelación residencial. ¿Continuar de todos modos?')) return;
-  const deposit = roundedDeposit(total, pct);
+  if (T.pct > 30 && !confirm('Un depósito mayor de 30% es inusualmente alto para remodelación residencial. ¿Continuar de todos modos?')) return;
   const startDate = document.getElementById('cm-start').value || null;
   const completionDate = document.getElementById('cm-completion').value || null;
   const hardDeadline = document.getElementById('cm-hard-deadline').checked === true;
@@ -2020,12 +2027,10 @@ async function generateContract() {
     const { error } = await sb.from('contracts').insert({
       project_id: pid, quote_id: p.primary_quote_id || null,
       client_name: p.client_name, client_email: p.client_email, client_property: p.client_property,
-      scope, contract_total: total, deposit_amount: deposit, deposit_percent: pct,
+      scope, contract_total: T.subtotal, iva_applies: T.ivaApplies, iva_rate: T.ivaRate,
+      deposit_amount: T.deposit, deposit_percent: T.pct,
       start_date: startDate, completion_date: completionDate, hard_deadline: hardDeadline,
       payment_terms: terms || null,
-      guarantee_terms: CONTRACT_DEFAULT_TERMS.guarantee,
-      change_order_terms: CONTRACT_DEFAULT_TERMS.change_order,
-      cancellation_terms: CONTRACT_DEFAULT_TERMS.cancellation,
       status: 'draft',
     });
     if (error) throw error;
