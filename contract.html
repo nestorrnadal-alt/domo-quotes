@@ -137,7 +137,7 @@ const CLAUSES = {
   concealed: "The scope and price are based on what was visible at the time of quoting. Except where the scope or quote says otherwise, all walls, ceilings and openings in the scope are assumed to be non-structural and non-load-bearing, based on visual inspection only.\n\nIf Domo encounters a concealed condition — hidden piping or wiring, water damage, termite or structural damage, unpermitted prior work, or suspected hazardous material — or if any element proves to be load-bearing, Domo stops work in that area, notifies the Client within twenty-four (24) hours with photographs, and prices the additional work as a change order. Structural repair, engineering and hazardous-material abatement are outside this agreement unless the scope or quote includes them, and are the Client's to authorize and pay for. If the Client does not decide within five (5) working days of the notice, the schedule extends by the delay and the remobilization fee described above may apply.",
   materials: "Principal materials — with brand, model, color and specification where applicable — are listed in the quote delivered with this agreement. Domo furnishes materials of good quality suitable for the work unless the Client specifies otherwise in writing. Where a specified item is unavailable or discontinued, Domo notifies the Client and may substitute an item of equal or better quality and specification.\n\nTitle and risk of loss for materials pass to the Client on delivery to the site or on payment, whichever is earlier — except that Domo remains responsible for loss or damage caused by Domo, its employees or its subcontractors. A material price increase adjusts the price only where it exceeds 10% of that item's quoted cost, arises after a Client-caused delay of more than ten (10) working days, and is shown to the Client with supplier documentation before the material is ordered.",
   site: "Domo works from 7:00 a.m. to 3:00 p.m., Monday through Friday. The Client provides safe, unobstructed access during those hours, along with water and electricity at the site at no charge to Domo; Saturday and evening work is by agreement.\n\nBefore the start date the Client clears the work area of furniture, belongings and anything fragile or valuable, and discloses in writing any condition it knows of behind the walls or under the floors. Domo is not responsible for pre-existing conditions, for damage to items the Client failed to remove after being asked, or for ordinary dust and vibration inherent in demolition work; this does not excuse damage caused by Domo's own negligence. Where the Client supplies appliances, fixtures or finishes, they must be on site before the week they are needed, and selections are due at least five (5) working days before they are needed.",
-  responsibility: "Each party is responsible for its own negligence and will indemnify the other against third-party claims arising from its own negligent acts or omissions in connection with the work. Domo may perform the work through its own personnel or qualified subcontractors and remains responsible to the Client for the work either way. The Client maintains its own property and homeowner's insurance in force throughout the work.",
+  responsibility: "Each party is responsible for its own negligence and will indemnify the other against third-party claims arising from its own negligent acts or omissions in connection with the work. Domo may perform the work through its own personnel or qualified subcontractors and remains responsible to the Client for the work either way. Domo carries commercial general liability insurance; certificates of insurance are available on request. The Client maintains its own property and homeowner's insurance in force throughout the work.",
   cleanup: "Domo removes its debris and leaves the work area in broom-clean condition — swept, with construction debris, packaging and offcuts removed from the property — at completion. Disposal of construction debris is included where listed in the scope; otherwise it is billed at cost. Final detailed cleaning is not included; dust removal is not included and can be quoted separately.",
   liability: "Please read this section — it limits what you can recover from Domo. Except for the items listed next, the most Domo can be required to pay under this agreement is the contract price. That limit does not apply to injury to a person, damage caused by Domo's gross negligence or willful misconduct, or Domo's indemnity obligations above. Neither party pays the other for knock-on losses — lost rental or business income, loss of use of the property, or a drop in property value. Nothing in this agreement limits a right or a liability that Puerto Rico law does not allow to be limited or waived.",
   cancel_3day: "Your right to cancel. If the Client signed this agreement somewhere other than Domo's place of business, the Client may cancel it without cost or penalty within three (3) business days of signing, by written notice to Domo at the mailing or email address in this agreement. On a timely cancellation Domo refunds the full deposit within ten (10) days.",
@@ -254,8 +254,11 @@ function render(){
   const firmLine = (c.hard_deadline && c.completion_date)
     ? ` The parties agree the substantial-completion date above is a firm deadline; Domo will meet it except for the extension events listed below.`
     : ` Where the parties expressly agree in writing that the completion date is a firm deadline, Domo will meet that date except for the extension events listed below.`;
+  const gfSentence = (c.hard_deadline && c.completion_date)
+    ? 'The start date is a good-faith estimate.'
+    : 'The start and substantial-completion dates above are good-faith estimates.';
   const schedule = (dateLine ? dateLine + ' ' : '')
-    + 'The start and substantial-completion dates above are good-faith estimates.' + firmLine
+    + gfSentence + firmLine
     + ' They extend, without penalty to either party, by the time actually lost to approved change orders, concealed conditions, permit delays, material shortages, Client-caused delays, and events beyond Domo’s reasonable control, including severe weather, hurricane warnings, utility interruptions, strikes and government action. Domo will notify the Client in writing when any of these arises and state the expected extension.'
     + `\n\nIf the Client suspends the work, or delays access, a decision or a selection, by more than five (5) working days, Domo may charge a reasonable remobilization fee, quoted to the Client in writing before the charge is incurred.`;
 
@@ -278,12 +281,12 @@ function render(){
         <div class="party">
           <div class="role">Contractor</div>
           <div class="name">${esc(companyName)}</div>
-          <div class="meta">${[company.company_address,company.company_phone,company.company_email].filter(Boolean).map(esc).join('<br>')||'Puerto Rico'}${(company.company_daco_reg||company.company_license)?`<br>${[company.company_daco_reg?('DACO Reg. '+esc(company.company_daco_reg)):'',company.company_license?('Lic. '+esc(company.company_license)):''].filter(Boolean).join(' · ')}`:''}</div>
+          <div class="meta">Mailing address:<br>${[company.company_address||'San Juan, Puerto Rico',company.company_phone,company.company_email].filter(Boolean).map(esc).join('<br>')}${(company.company_daco_reg||company.company_license)?`<br>${[company.company_daco_reg?('DACO Reg. '+esc(company.company_daco_reg)):'',company.company_license?('Lic. '+esc(company.company_license)):''].filter(Boolean).join(' · ')}`:''}</div>
         </div>
         <div class="party">
           <div class="role">Client</div>
           <div class="name">${esc(c.client_name||'—')}</div>
-          <div class="meta">${[c.client_property,c.client_email].filter(Boolean).map(esc).join('<br>')}</div>
+          <div class="meta">Mailing address:<br>${c.client_email?esc(c.client_email)+'<br>':''}<br>Property (work site):<br>${esc(c.client_property||'—')}</div>
         </div>
       </div>
 
@@ -312,13 +315,13 @@ function render(){
       ${clause('Permits &amp; licenses', permits)}
       ${clause('Materials, title &amp; risk of loss', CLAUSES.materials)}
       ${clause('Site access &amp; client responsibilities', CLAUSES.site)}
-      ${clause('Responsibility', CLAUSES.responsibility)}
+      ${clause('Responsibility &amp; insurance', CLAUSES.responsibility)}
       ${clause('Cleanup', CLAUSES.cleanup)}
       ${clause('Workmanship warranty', terms.guarantee)}
       ${flagHTML('Limitation of liability', `
         <p><b>Please read this section — it limits what you can recover from Domo.</b></p>
         <p><b>The limit.</b> Except for the items listed next, the most Domo can be required to pay under this agreement is the contract price.</p>
-        <p><b>Exceptions.</b> This limit does not apply to injury to a person, damage caused by Domo’s gross negligence or willful misconduct, or Domo’s indemnity obligations above.</p>
+        <p><b>Exceptions.</b> This limit does not apply to injury to a person, damage caused by Domo’s gross negligence or willful misconduct, Domo’s indemnity obligations above, or any claim to the extent it is covered by Domo’s insurance.</p>
         <p><b>Knock-on losses.</b> Neither party pays the other for lost rental or business income, loss of use of the property, or a drop in property value.</p>
         <p><b>Puerto Rico law comes first.</b> Nothing in this agreement limits a right or a liability that Puerto Rico law does not allow to be limited or waived.</p>`)}
       ${cancellation ? clause('Cancellation &amp; termination', cancellation)
