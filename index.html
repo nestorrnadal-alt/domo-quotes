@@ -936,6 +936,13 @@ let currentQuotePhotos = [];
 const PHOTO_BUCKET = 'quote-photos';
 let pdfStyle = 'itemized';
 let settingsCache = {};
+// Parse a numeric field, treating 0 as a real value. Falls back to `def` only
+// when the value is null/undefined/empty/NaN. (`x || 40` silently turned 0 into 40.)
+function numOr(v, def) {
+  if (v === null || v === undefined || v === '') return def;
+  const n = parseFloat(v);
+  return Number.isNaN(n) ? def : n;
+}
 let catalogCache = [];
 let clientsCache = [];
 let quotesCache = [];
@@ -1046,9 +1053,9 @@ function renderSettings() {
   document.getElementById('s-address').value = settingsCache.company_address || '';
   document.getElementById('s-daco').value = settingsCache.company_daco_reg || '';
   document.getElementById('s-license').value = settingsCache.company_license || '';
-  document.getElementById('s-margin-labor').value = settingsCache.margin_labor || '40';
-  document.getElementById('s-margin-materials').value = settingsCache.margin_materials || '25';
-  document.getElementById('s-margin-equipment').value = settingsCache.margin_equipment || '25';
+  document.getElementById('s-margin-labor').value = numOr(settingsCache.margin_labor, 40);
+  document.getElementById('s-margin-materials').value = numOr(settingsCache.margin_materials, 25);
+  document.getElementById('s-margin-equipment').value = numOr(settingsCache.margin_equipment, 25);
 }
 
 async function saveSettings() {
@@ -2408,9 +2415,9 @@ async function loadQuoteForEditing(id) {
   document.getElementById('total-override').value = '';
   document.getElementById('inc-materials').checked = quote.includes_materials !== false;
   document.getElementById('inc-equipment').checked = quote.includes_equipment !== false;
-  document.getElementById('margin-labor').value = quote.margin_labor || 40;
-  document.getElementById('margin-materials').value = quote.margin_materials || 25;
-  document.getElementById('margin-equipment').value = quote.margin_equipment || 25;
+  document.getElementById('margin-labor').value = numOr(quote.margin_labor, 40);
+  document.getElementById('margin-materials').value = numOr(quote.margin_materials, 25);
+  document.getElementById('margin-equipment').value = numOr(quote.margin_equipment, 25);
 
   // Update UI to show edit mode
   document.getElementById('quote-page-title').textContent = quote.status === 'shadow' ? 'Cotizar (borrador IA)' : 'Editar cotización';
@@ -2450,9 +2457,9 @@ async function startFromShadow(id) {
   document.getElementById('total-override').value = '';
   document.getElementById('inc-materials').checked = shadow.includes_materials !== false;
   document.getElementById('inc-equipment').checked = shadow.includes_equipment !== false;
-  document.getElementById('margin-labor').value = shadow.margin_labor || 40;
-  document.getElementById('margin-materials').value = shadow.margin_materials || 25;
-  document.getElementById('margin-equipment').value = shadow.margin_equipment || 25;
+  document.getElementById('margin-labor').value = numOr(shadow.margin_labor, 40);
+  document.getElementById('margin-materials').value = numOr(shadow.margin_materials, 25);
+  document.getElementById('margin-equipment').value = numOr(shadow.margin_equipment, 25);
   const d = new Date(); d.setDate(d.getDate() + 30);
   document.getElementById('q-valid-until').value = d.toISOString().split('T')[0];
 
@@ -2475,9 +2482,9 @@ function updateQuoteNumberDisplay() {
 }
 
 function setDefaultNewQuote() {
-  document.getElementById('margin-labor').value = settingsCache.margin_labor || 40;
-  document.getElementById('margin-materials').value = settingsCache.margin_materials || 25;
-  document.getElementById('margin-equipment').value = settingsCache.margin_equipment || 25;
+  document.getElementById('margin-labor').value = numOr(settingsCache.margin_labor, 40);
+  document.getElementById('margin-materials').value = numOr(settingsCache.margin_materials, 25);
+  document.getElementById('margin-equipment').value = numOr(settingsCache.margin_equipment, 25);
   const d = new Date(); d.setDate(d.getDate() + 30);
   document.getElementById('q-valid-until').value = d.toISOString().split('T')[0];
   updateQuoteNumberDisplay();
@@ -2852,9 +2859,10 @@ function buildTotals() {
   const incIVU = document.getElementById('inc-ivu').checked;
   const incMat = document.getElementById('inc-materials').checked;
   const incEq = document.getElementById('inc-equipment').checked;
-  const mLab = parseFloat(document.getElementById('margin-labor').value) || 40;
-  const mMat = parseFloat(document.getElementById('margin-materials').value) || 25;
-  const mEq = parseFloat(document.getElementById('margin-equipment').value) || 25;
+  // numOr: 0 is a valid margin — only fall back when the field is empty/NaN.
+  const mLab = numOr(document.getElementById('margin-labor').value, 40);
+  const mMat = numOr(document.getElementById('margin-materials').value, 25);
+  const mEq = numOr(document.getElementById('margin-equipment').value, 25);
   let cL=0,cM=0,cE=0;
   currentLineItems.forEach(i => { const t=i.quantity*i.unit_cost; if(i.category==='labor')cL+=t; else if(i.category==='materials')cM+=t; else cE+=t; });
   const bL=cL/(1-mLab/100), bM=incMat?cM/(1-mMat/100):0, bE=incEq?cE/(1-mEq/100):0;
