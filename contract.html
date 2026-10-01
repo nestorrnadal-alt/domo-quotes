@@ -160,10 +160,11 @@ async function boot(){
   if(!token){ showState('This link is missing its agreement code. Please use the link Domo sent you.'); return; }
   // company details (best-effort)
   try{
-    const { data } = await sb.from('settings').select('key,value');
-    (data||[]).forEach(r=> company[r.key]=r.value);
+    const { data } = await sb.rpc('company_public_settings');
+    company = data || {};
   }catch(e){}
-  const { data, error } = await sb.from('contracts').select('*').eq('public_token', token).maybeSingle();
+  // Only this one agreement, looked up by its secret link token (rpc — the contracts table is staff-only).
+  const { data, error } = await sb.rpc('contract_by_token', { p_token: token });
   if(error || !data){ showState('We couldn’t find this agreement. The link may be invalid or expired — please contact Domo.'); return; }
   contract = data;
   render();
@@ -376,10 +377,9 @@ async function submitSign(){
   const btn=document.getElementById('sign-btn'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Signing…';
   let sigData=''; try{ sigData=document.getElementById('sigpad').toDataURL('image/png'); }catch(e){}
   try{
-    const { error } = await sb.from('contracts').update({
-      status:'signed', signed_at:new Date().toISOString(), signer_name:name, signature_data:sigData
-    }).eq('public_token', token).neq('status','signed'); // don't overwrite an existing signature
+    const { data: signed, error } = await sb.rpc('sign_contract', { p_token: token, p_signer_name: name, p_signature_data: sigData });
     if(error) throw error;
+    if(!signed) throw new Error('this agreement was already signed'); // never overwrites an existing signature
     contract.status='signed'; contract.signed_at=new Date().toISOString(); contract.signer_name=name;
     window.scrollTo({top:0,behavior:'smooth'});
     render();

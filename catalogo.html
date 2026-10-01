@@ -191,6 +191,9 @@
 const SUPABASE_URL = 'https://mpgljurndbfusxtcrogr.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_eSqiIIUFZck9XFdpgE3Ctg_u3-lBI88';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false } });
+// Price changes are staff-only: they use the Cotizaciones login (same site as the quotes app,
+// so a session there carries over). Reviews stay open to anyone with the link.
+const sbAdmin = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const NAMES = ["Cotto","Nestor","Jose Vega","Janet"];
 const WA = "17874190300";
@@ -377,9 +380,11 @@ setInterval(()=>{ if(pending.size) flushPending(); }, 30000);
 // ---------- summary (+ admin apply) ----------
 async function applyRate(itemId, newRate, reason){
   const it=ITEMS.find(x=>x.id===itemId); if(!it) return;
-  const { error } = await sb.from('catalog_items').update({ rate:newRate }).eq('id',itemId);
+  const { data:{ session } } = await sbAdmin.auth.getSession();
+  if(!session){ toast('Entra a Cotizaciones para aplicar precios'); window.open('./','_blank'); return; }
+  const { error } = await sbAdmin.from('catalog_items').update({ rate:newRate }).eq('id',itemId);
   if(error){ toast('No se pudo actualizar'); return; }
-  await sb.from('catalog_rate_history').insert({ item_id:itemId, old_rate:it.rate, new_rate:newRate, changed_by:reviewer, reason });
+  await sbAdmin.from('catalog_rate_history').insert({ item_id:itemId, old_rate:it.rate, new_rate:newRate, changed_by:session.user.email||reviewer, reason });
   it.rate=newRate; toast(`${it.service}: $${money(newRate)}`); renderSummary();
 }
 function renderSummary(){
