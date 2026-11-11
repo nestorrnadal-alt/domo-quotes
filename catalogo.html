@@ -269,7 +269,7 @@ function renderGate(){
 async function setReviewer(name){
   reviewer=name.trim(); ls.set('rev.name',reviewer); loadLocal(); renderGate();
   try{ await loadReviews(); }catch(_){}
-  render(); flushPending();
+  defaultFilter(); render(); flushPending();
 }
 $('#whoBtn').onclick=()=>{ if(confirm(`¿Cambiar de revisor? (ahora: ${reviewer})`)){ reviewer=''; ls.set('rev.name',''); answers={}; renderGate(); render(); } };
 
@@ -300,6 +300,12 @@ function renderChips(){
   $('#progTxt').textContent=`${coreDone} / ${core.length}`;
   $('#progBar').style.width=(core.length?100*coreDone/core.length:0)+'%';
   const later=ITEMS.filter(it=>it.wave===9).length; $('#togLater').textContent=`Más adelante (${later})`; $('#togLater').setAttribute('aria-pressed',showLater);
+}
+// Land on the visit-task block until it is fully reviewed; after that, honor the saved chip.
+function defaultFilter(){
+  const i=TRADES.findIndex(t=>t.wave===1);
+  if(i>=0 && counts().per[i]<TRADES[i].items.length){ filterTrade=i; return; }
+  filterTrade = ls.get('rev.trade') ?? -1;
 }
 function startBanner(){
   const cw=currentWave(); if(cw===9) return `<div class="start"><span class="k">🎉 Todo lo prioritario está revisado</span>Gracias. Lo que queda está en <b>Más adelante</b>.</div>`;
@@ -476,7 +482,7 @@ $('#sendBtn').onclick=async()=>{
   try{ await loadCatalog(); }
   catch(e){ $('#loading').textContent='No se pudo cargar el catálogo. Revisa tu conexión e intenta de nuevo.'; console.error(e); return; }
   $('#loading').hidden=true;
-  if(reviewer){ loadLocal(); try{ await loadReviews(); setOnline(true); }catch(_){ setOnline(false); } }
+  if(reviewer){ loadLocal(); try{ await loadReviews(); setOnline(true); }catch(_){ setOnline(false); } defaultFilter(); }
   renderGate(); render(); flushPending();
 })();
 </script>
