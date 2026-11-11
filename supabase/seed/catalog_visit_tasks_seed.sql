@@ -1,0 +1,31 @@
+-- Handyman visit tasks (wave 1). Reviewed in MINUTES on catalogo.html; feeds the task-based booking flow.
+-- Minutes = first estimate from 1,058 handyman bookings (task_list mining) + trade norms; Cotto reviews them.
+insert into public.catalog_items (id,trade_order,trade,trade_hue,sort,service,unit,basis,rate,profile,review_wave,minutes,complexity_flag,note) values
+('h01',0,'Tareas de visita (Handyman)','#7f8f1f',1,'Cambiar bombilla / lámpara sencilla','tarea','labor',0,'flat',1,20,false,'10% de todas las tareas pedidas'),
+('h02',0,'Tareas de visita (Handyman)','#7f8f1f',2,'Instalar lámpara o plafón nuevo (caja existente)','tarea','labor',0,'flat',1,45,true,null),
+('h03',0,'Tareas de visita (Handyman)','#7f8f1f',3,'Instalar abanico de techo','tarea','labor',0,'flat',1,60,true,null),
+('h04',0,'Tareas de visita (Handyman)','#7f8f1f',4,'Cambiar receptáculo o switch','tarea','labor',0,'flat',1,30,true,null),
+('h05',0,'Tareas de visita (Handyman)','#7f8f1f',5,'Montar TV en pared (con bracket)','tarea','labor',0,'flat',1,45,false,'masonry: +15 min'),
+('h06',0,'Tareas de visita (Handyman)','#7f8f1f',6,'Colgar cuadro / espejo / objeto (por pieza)','tarea','labor',0,'flat',1,15,false,null),
+('h07',0,'Tareas de visita (Handyman)','#7f8f1f',7,'Instalar cortinas / blinds (por ventana)','tarea','labor',0,'flat',1,30,false,null),
+('h08',0,'Tareas de visita (Handyman)','#7f8f1f',8,'Montar estante / repisa / tablillero','tarea','labor',0,'flat',1,30,false,null),
+('h09',0,'Tareas de visita (Handyman)','#7f8f1f',9,'Ensamblar mueble (IKEA, etc.)','tarea','labor',0,'flat',1,60,false,null),
+('h10',0,'Tareas de visita (Handyman)','#7f8f1f',10,'Cambiar mezcladora / faucet','tarea','labor',0,'flat',1,45,true,null),
+('h11',0,'Tareas de visita (Handyman)','#7f8f1f',11,'Cambiar sapito / válvula / push button de inodoro','tarea','labor',0,'flat',1,30,true,null),
+('h12',0,'Tareas de visita (Handyman)','#7f8f1f',12,'Instalar inodoro (reemplazo)','tarea','labor',0,'flat',1,90,true,null),
+('h13',0,'Tareas de visita (Handyman)','#7f8f1f',13,'Instalar / reconectar lavamanos o fregadero','tarea','labor',0,'flat',1,90,true,null),
+('h14',0,'Tareas de visita (Handyman)','#7f8f1f',14,'Destape sencillo (lavamanos, ducha)','tarea','labor',0,'flat',1,45,true,null),
+('h15',0,'Tareas de visita (Handyman)','#7f8f1f',15,'Reparar liqueo menor (tubería expuesta)','tarea','labor',0,'flat',1,45,true,null),
+('h16',0,'Tareas de visita (Handyman)','#7f8f1f',16,'Sellar bañera / tope / ventana (caulking)','tarea','labor',0,'flat',1,30,false,null),
+('h17',0,'Tareas de visita (Handyman)','#7f8f1f',17,'Ajustar / alinear puerta, cambiar bisagras','tarea','labor',0,'flat',1,30,false,null),
+('h18',0,'Tareas de visita (Handyman)','#7f8f1f',18,'Cambiar cerradura / manija','tarea','labor',0,'flat',1,30,false,null),
+('h19',0,'Tareas de visita (Handyman)','#7f8f1f',19,'Instalar screen / mosquitero','tarea','labor',0,'flat',1,30,false,null),
+('h20',0,'Tareas de visita (Handyman)','#7f8f1f',20,'Reparar / cambiar operador de ventana','tarea','labor',0,'flat',1,30,false,null),
+('h21',0,'Tareas de visita (Handyman)','#7f8f1f',21,'Retoque de pintura (área pequeña, cliente pone pintura)','tarea','labor',0,'flat',1,60,false,null),
+('h22',0,'Tareas de visita (Handyman)','#7f8f1f',22,'Resane menor de pared (huecos, masilla)','tarea','labor',0,'flat',1,45,false,null),
+('h23',0,'Tareas de visita (Handyman)','#7f8f1f',23,'Montar microondas / campana / extractor','tarea','labor',0,'flat',1,60,false,null),
+('h24',0,'Tareas de visita (Handyman)','#7f8f1f',24,'Conectar lavadora / secadora (incl. ducto)','tarea','labor',0,'flat',1,60,true,null),
+('h25',0,'Tareas de visita (Handyman)','#7f8f1f',25,'Anclar mueble / electrodoméstico a la pared','tarea','labor',0,'flat',1,20,false,null),
+('h26',0,'Tareas de visita (Handyman)','#7f8f1f',26,'Cambiar filtro / limpieza básica de A/C (sin gas)','tarea','labor',0,'flat',1,30,false,null),
+('h27',0,'Tareas de visita (Handyman)','#7f8f1f',27,'Otra tarea menor (describir) — estimado por defecto','tarea','labor',0,'flat',1,60,false,'35% de lo pedido es cola larga')
+on conflict (id) do update set service=excluded.service, minutes=excluded.minutes, complexity_flag=excluded.complexity_flag, review_wave=1, note=excluded.note;

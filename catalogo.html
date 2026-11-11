@@ -150,6 +150,15 @@
   .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:9px 14px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:90vw;text-align:center}
   .toast.show{opacity:1}
   .loading{text-align:center;color:var(--muted);padding:40px 0}
+  .start{background:var(--surface);border:1px solid var(--hair);border-left:4px solid var(--lime);border-radius:12px;padding:12px 14px;margin:14px 0 4px;font-size:13.5px;color:var(--ink-soft)}
+  .start b{color:var(--ink)} .start .k{font-family:"Epilogue";font-weight:800;font-size:16px;color:var(--ink);display:block;margin-bottom:2px}
+  .wave{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:26px 0 -10px;display:flex;align-items:center;gap:8px}
+  .wave::after{content:"";flex:1;height:1px;background:var(--hair)}
+  .wave.now{color:var(--lime)}
+  .rules{font-size:12.5px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--hair);border-radius:10px;padding:9px 12px;margin:0 0 10px;line-height:1.5}
+  .rules b{color:var(--ink)}
+  .flag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--alto-bg);color:var(--alto)}
+  .chip.sep{border:none;background:transparent;color:var(--muted);padding-inline:2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -164,6 +173,7 @@
     <div class="chips" id="chips"></div>
     <div class="tools">
       <button class="tog" id="togPend" aria-pressed="false">Solo pendientes</button>
+      <button class="tog" id="togLater" aria-pressed="false">Más adelante</button>
       <button class="tog" id="togSum" aria-pressed="false">Resumen</button>
       <span class="spacer"></span>
       <button class="tog" id="sendBtn">Enviar por WhatsApp</button>
@@ -175,14 +185,14 @@
   <div class="loading" id="loading">Cargando catálogo…</div>
   <section class="gate" id="gate" hidden>
     <h1>¿Quién revisa el catálogo?</h1>
-    <p>Para cada partida marca si el precio está <b>bien</b>, <b>muy alto</b> o <b>muy bajo</b>. Si no está bien, dinos <b>cuánto cobrarías tú</b>. Puedes hacerlo en varias sesiones — se guarda solo.</p>
+    <p>Vamos por partes: primero las <b>tareas de la visita de handyman</b> (en <b>minutos</b>, no en dólares), después los oficios que más cotizamos. Marca <b>bien</b>, <b>muy alto</b> o <b>muy bajo</b>; si no está bien, dinos tu número. Se guarda solo — hazlo cuando tengas 15 minutos.</p>
     <div class="names" id="names"></div>
     <div class="other"><input id="otherName" placeholder="Otro nombre…" autocomplete="off"><button class="btn" id="otherGo">Empezar</button></div>
   </section>
   <div id="offline" class="banner" hidden><span>⚠︎</span><div><b>Sin conexión.</b> Tus respuestas se guardan en este teléfono y se subirán cuando vuelva la señal. Si no, usa <b>Enviar por WhatsApp</b>.</div></div>
   <div id="list"></div>
   <div id="summary" hidden></div>
-  <footer id="foot" hidden>Rates = línea base (condición Bueno / complejidad Baja). Los multiplicadores ajustan según condición y acceso — evalúa el <b>rate base</b>.</footer>
+  <footer id="foot" hidden>Tareas de visita = <b>minutos</b> por tarea. Partidas de proyecto = rate base (condición Bueno / complejidad Baja); los multiplicadores ajustan después — evalúa el <b>rate base</b>.</footer>
 </main>
 <div class="toast" id="toast"></div>
 
@@ -205,6 +215,9 @@ const money = n=>{ n=Number(n); return n>=100 ? n.toLocaleString('en-US',{maximu
 const ls = { get(k){ try{return JSON.parse(localStorage.getItem(k))}catch(_){return null} }, set(k,v){ try{localStorage.setItem(k,JSON.stringify(v))}catch(_){} } };
 
 let ITEMS = [], TRADES = [];                 // from catalog_items
+const WAVES = {1:'Ahora · Tareas de la visita (minutos)', 2:'Después · Pintura, Empañetado, Albañilería', 3:'Plomería', 4:'Eléctrico', 5:'Impermeabilización', 9:'Más adelante'};
+const isMin = it => it.minutes != null;      // visit tasks are reviewed in minutes, not $
+let showLater = false;
 let reviewer = (new URLSearchParams(location.search).get('r') || ls.get('rev.name') || '').trim();
 const ADMIN = /^(nestor|néstor)$/i.test(reviewer) || new URLSearchParams(location.search).has('admin');
 let answers = {};                            // itemId -> {verdict, suggested, note, updatedAt}
@@ -219,12 +232,12 @@ function saveLocal(){ ls.set(localKey(), answers); }
 
 // ---------- data ----------
 async function loadCatalog(){
-  const { data, error } = await sb.from('catalog_items').select('*').neq('status','retired').order('trade_order').order('sort');
+  const { data, error } = await sb.from('catalog_items').select('*').neq('status','retired').order('review_wave').order('trade_order').order('sort');
   if(error) throw error;
-  ITEMS = data.map(r=>({...r, rate:Number(r.rate), ti:r.trade_order-1}));
+  ITEMS = data.map(r=>({...r, rate:Number(r.rate), wave:Number(r.review_wave??9)}));
   const map=new Map();
-  ITEMS.forEach(it=>{ if(!map.has(it.trade_order)) map.set(it.trade_order,{n:it.trade,hue:it.trade_hue||'#3652a5',order:it.trade_order,items:[]}); map.get(it.trade_order).items.push(it); });
-  TRADES=[...map.values()].sort((a,b)=>a.order-b.order);
+  ITEMS.forEach(it=>{ if(!map.has(it.trade_order)) map.set(it.trade_order,{n:it.trade,hue:it.trade_hue||'#3652a5',order:it.trade_order,wave:it.wave,items:[]}); map.get(it.trade_order).items.push(it); });
+  TRADES=[...map.values()].sort((a,b)=>a.wave-b.wave||a.order-b.order);
   TRADES.forEach((t,i)=>t.items.forEach(it=>it.ti=i));
 }
 async function loadReviews(){
@@ -266,14 +279,33 @@ function counts(){
   for(const it of ITEMS){ if(answers[it.id]?.verdict){ per[it.ti]++; done++; } }
   return {per,done,total:ITEMS.length};
 }
-function renderChips(){
+// lowest wave that still has unreviewed items (never the parked wave 9)
+function currentWave(){
   const c=counts();
-  const all=`<button class="chip ${c.done===c.total&&c.total?'done':''}" data-t="-1" aria-pressed="${filterTrade===-1}">Todo <span class="n">${c.done}/${c.total}</span></button>`;
-  const rest=TRADES.map((t,i)=>`<button class="chip ${c.per[i]===t.items.length?'done':''}" data-t="${i}" aria-pressed="${filterTrade===i}">${esc(t.n)} <span class="n">${c.per[i]}/${t.items.length}</span></button>`).join('');
-  $('#chips').innerHTML=all+rest;
-  $('#chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ filterTrade=Number(b.dataset.t); ls.set('rev.trade',filterTrade); render(); window.scrollTo({top:0}); });
-  $('#progTxt').textContent=`${c.done} / ${c.total}`;
-  $('#progBar').style.width=(c.total?100*c.done/c.total:0)+'%';
+  for(const w of [1,2,3,4,5]){ const ts=TRADES.map((t,i)=>({t,i})).filter(x=>x.t.wave===w); if(ts.some(x=>c.per[x.i]<x.t.items.length)) return w; }
+  return 9;
+}
+function renderChips(){
+  const c=counts(); const cw=currentWave();
+  const vis=TRADES.map((t,i)=>({t,i})).filter(x=>showLater||x.t.wave!==9);
+  const core=ITEMS.filter(it=>it.wave!==9); const coreDone=core.filter(it=>answers[it.id]?.verdict).length;
+  let html=`<button class="chip ${coreDone===core.length&&core.length?'done':''}" data-t="-1" aria-pressed="${filterTrade===-1}">Todo <span class="n">${coreDone}/${core.length}</span></button>`;
+  let lastWave=null;
+  for(const {t,i} of vis){
+    if(t.wave!==lastWave){ html+=`<span class="chip sep">${t.wave===cw?'▶ ahora':t.wave===9?'más adelante':'después'}</span>`; lastWave=t.wave; }
+    html+=`<button class="chip ${c.per[i]===t.items.length?'done':''}" data-t="${i}" aria-pressed="${filterTrade===i}">${esc(t.n.replace(' (Handyman)',''))} <span class="n">${c.per[i]}/${t.items.length}</span></button>`;
+  }
+  $('#chips').innerHTML=html;
+  $('#chips').querySelectorAll('.chip[data-t]').forEach(b=>b.onclick=()=>{ filterTrade=Number(b.dataset.t); ls.set('rev.trade',filterTrade); render(); window.scrollTo({top:0}); });
+  $('#progTxt').textContent=`${coreDone} / ${core.length}`;
+  $('#progBar').style.width=(core.length?100*coreDone/core.length:0)+'%';
+  const later=ITEMS.filter(it=>it.wave===9).length; $('#togLater').textContent=`Más adelante (${later})`; $('#togLater').setAttribute('aria-pressed',showLater);
+}
+function startBanner(){
+  const cw=currentWave(); if(cw===9) return `<div class="start"><span class="k">🎉 Todo lo prioritario está revisado</span>Gracias. Lo que queda está en <b>Más adelante</b>.</div>`;
+  const ts=TRADES.map((t,i)=>({t,i})).filter(x=>x.t.wave===cw); const c=counts();
+  const left=ts.reduce((s,x)=>s+x.t.items.length-c.per[x.i],0);
+  return `<div class="start"><span class="k">Empieza aquí</span><b>${esc(WAVES[cw])}</b> — te quedan <b>${left}</b> partidas${cw===1?'. Aquí evalúas <b>cuántos minutos</b> toma cada tarea, no el precio.':''}</div>`;
 }
 function multTxt(it){
   const s=[]; if(Number(it.cond_bad)!==1) s.push(`Condición: Reg <b>×${it.cond_reg}</b> · Malo <b>×${it.cond_bad}</b>`);
@@ -283,26 +315,26 @@ function multTxt(it){
 function othersHint(it){
   const o=allReviews.filter(r=>r.item_id===it.id && r.reviewer.toLowerCase()!==reviewer.toLowerCase());
   if(!o.length) return '';
-  return `<div class="others">${o.map(r=>`<span>${esc(r.reviewer)}: ${r.verdict==='ok'?'👍':r.verdict==='alto'?'⬆':'⬇'}${r.suggested!=null?' $'+money(r.suggested):''}</span>`).join('')}</div>`;
+  return `<div class="others">${o.map(r=>`<span>${esc(r.reviewer)}: ${r.verdict==='ok'?'👍':r.verdict==='alto'?'⬆':'⬇'}${r.suggested!=null?' '+fmtVal(it,r.suggested):''}</span>`).join('')}</div>`;
 }
 function itemCard(it){
   const a=answers[it.id]||{}; const v=a.verdict||'';
-  const [bl,bc]=BASIS[it.basis]||["—",""]; const showMore=v==='alto'||v==='bajo';
+  const [bl,bc]=BASIS[it.basis]||["—",""]; const showMore=v==='alto'||v==='bajo'; const mn=isMin(it);
   return `<article class="item" id="it-${it.id}" data-id="${it.id}" data-v="${v}">
     <div class="i-top">
       <div><div class="i-svc">${esc(it.service)}</div>
-        <div class="i-meta"><span>por <b>${esc(it.unit)}</b></span><span class="basis ${bc}">${bl}</span></div></div>
-      <div class="i-rate"><b>$${money(it.rate)}</b><span>/ ${esc(it.unit)}</span></div>
+        <div class="i-meta">${mn?`<span>tiempo estimado</span>${it.complexity_flag?'<span class="flag">+$100 complejo</span>':''}`:`<span>por <b>${esc(it.unit)}</b></span><span class="basis ${bc}">${bl}</span>`}</div></div>
+      <div class="i-rate">${mn?`<b>⏱ ${it.minutes}</b><span>minutos</span>`:`<b>$${money(it.rate)}</b><span>/ ${esc(it.unit)}</span>`}</div>
     </div>
-    <div class="mult">${multTxt(it)}</div>
+    ${mn?'':`<div class="mult">${multTxt(it)}</div>`}
     ${it.note?`<div class="note">${esc(it.note)}</div>`:''}
     <div class="seg" role="group" aria-label="Veredicto">
       <button type="button" class="v-ok" data-v="ok" aria-pressed="${v==='ok'}">👍 Está bien<small>déjalo así</small></button>
-      <button type="button" class="v-alto" data-v="alto" aria-pressed="${v==='alto'}">⬆ Muy alto<small>bajaría el precio</small></button>
-      <button type="button" class="v-bajo" data-v="bajo" aria-pressed="${v==='bajo'}">⬇ Muy bajo<small>subiría el precio</small></button>
+      <button type="button" class="v-alto" data-v="alto" aria-pressed="${v==='alto'}">⬆ Muy alto<small>${mn?'toma menos tiempo':'bajaría el precio'}</small></button>
+      <button type="button" class="v-bajo" data-v="bajo" aria-pressed="${v==='bajo'}">⬇ Muy bajo<small>${mn?'toma más tiempo':'subiría el precio'}</small></button>
     </div>
     <div class="more" ${showMore?'':'hidden'}>
-      <div class="field"><label for="s-${it.id}">¿Cuánto cobrarías?</label><span class="cur">$</span><input type="number" inputmode="decimal" step="any" min="0" id="s-${it.id}" placeholder="${money(it.rate)}" value="${a.suggested??''}"><span class="cur">/ ${esc(it.unit)}</span></div>
+      <div class="field"><label for="s-${it.id}">${mn?'¿Cuántos minutos?':'¿Cuánto cobrarías?'}</label>${mn?'':'<span class="cur">$</span>'}<input type="number" inputmode="decimal" step="any" min="0" id="s-${it.id}" placeholder="${mn?it.minutes:money(it.rate)}" value="${a.suggested??''}"><span class="cur">${mn?'min':'/ '+esc(it.unit)}</span></div>
       <div class="field"><textarea id="n-${it.id}" rows="1" placeholder="¿Por qué? (opcional)">${esc(a.note||'')}</textarea></div>
     </div>
     <div class="field" style="margin-top:8px" ${showMore||!v?'hidden':''}><textarea id="o-${it.id}" rows="1" placeholder="Nota (opcional)">${esc(a.note||'')}</textarea></div>
@@ -316,12 +348,16 @@ function render(){
   $('#togPend').setAttribute('aria-pressed',onlyPending); $('#togSum').setAttribute('aria-pressed',showSummary);
   $('#summary').hidden=!showSummary; $('#list').hidden=showSummary;
   if(showSummary){ renderSummary(); return; }
-  let html='';
+  const cw=currentWave(); const c=counts();
+  let html=filterTrade===-1?startBanner():''; let lastWave=null;
   TRADES.forEach((t,i)=>{
     if(filterTrade!==-1 && i!==filterTrade) return;
+    if(filterTrade===-1 && t.wave===9 && !showLater) return;
     const its=t.items.filter(it=>!onlyPending || !answers[it.id]?.verdict);
     if(!its.length) return;
-    html+=`<section class="trade" style="--hue:${esc(t.hue)}"><div class="t-head"><span class="t-rail"></span><h2 class="t-name">${esc(t.n)}</h2><span class="t-meta">${counts().per[i]}/${t.items.length} revisadas</span></div>${its.map(itemCard).join('')}</section>`;
+    if(filterTrade===-1 && t.wave!==lastWave){ html+=`<div class="wave ${t.wave===cw?'now':''}">${esc(WAVES[t.wave]||'')}</div>`; lastWave=t.wave; }
+    const rules = t.wave===1 ? `<div class="rules"><b>Cómo se usa:</b> el cliente arma su lista y los minutos se suman. Hasta <b>3.5 h = media visita $250</b> · hasta <b>6.5 h = día completo $385</b> · más = 2 visitas. Tareas marcadas <span class="flag">+$100 complejo</span> (plomería, eléctrico, empañetado) suman el recargo. Dinos si los <b>minutos</b> son realistas para un handyman nuestro.</div>` : '';
+    html+=`<section class="trade" style="--hue:${esc(t.hue)}"><div class="t-head"><span class="t-rail"></span><h2 class="t-name">${esc(t.n)}</h2><span class="t-meta">${c.per[i]}/${t.items.length} revisadas</span></div>${rules}${its.map(itemCard).join('')}</section>`;
   });
   if(!html) html=`<p class="empty">🎉 Nada pendiente aquí. Elige otro oficio arriba o mira el <b>Resumen</b>.</p>`;
   $('#list').innerHTML=html;
@@ -346,6 +382,7 @@ $('#list').addEventListener('input',e=>{
   persist(id,true);
 });
 $('#togPend').onclick=()=>{ onlyPending=!onlyPending; render(); };
+$('#togLater').onclick=()=>{ showLater=!showLater; if(!showLater && filterTrade>=0 && TRADES[filterTrade]?.wave===9) filterTrade=-1; render(); };
 $('#togSum').onclick=async()=>{ showSummary=!showSummary; if(showSummary){ try{ await loadReviews(); }catch(_){} } render(); };
 
 // ---------- persistence (Supabase upsert, local fallback) ----------
@@ -382,11 +419,15 @@ async function applyRate(itemId, newRate, reason){
   const it=ITEMS.find(x=>x.id===itemId); if(!it) return;
   const { data:{ session } } = await sbAdmin.auth.getSession();
   if(!session){ toast('Entra a Cotizaciones para aplicar precios'); window.open('./','_blank'); return; }
-  const { error } = await sbAdmin.from('catalog_items').update({ rate:newRate }).eq('id',itemId);
+  const mn=isMin(it);
+  const { error } = await sbAdmin.from('catalog_items').update(mn?{ minutes:Math.round(newRate) }:{ rate:newRate }).eq('id',itemId);
   if(error){ toast('No se pudo actualizar'); return; }
-  await sbAdmin.from('catalog_rate_history').insert({ item_id:itemId, old_rate:it.rate, new_rate:newRate, changed_by:session.user.email||reviewer, reason });
-  it.rate=newRate; toast(`${it.service}: $${money(newRate)}`); renderSummary();
+  await sbAdmin.from('catalog_rate_history').insert({ item_id:itemId, old_rate:mn?it.minutes:it.rate, new_rate:newRate, changed_by:session.user.email||reviewer, reason:(mn?'[minutos] ':'')+reason });
+  if(mn) it.minutes=Math.round(newRate); else it.rate=newRate;
+  toast(`${it.service}: ${mn?Math.round(newRate)+' min':'$'+money(newRate)}`); renderSummary();
 }
+const fmtVal=(it,v)=> isMin(it) ? `${Math.round(v)} min` : `$${money(v)}`;
+const baseVal=it=> isMin(it) ? it.minutes : it.rate;
 function renderSummary(){
   const byRev={}; for(const r of allReviews){ (byRev[r.reviewer]=byRev[r.reviewer]||[]).push(r); }
   // include unsynced local answers for current reviewer
@@ -400,18 +441,18 @@ function renderSummary(){
     html+=`<div class="sum"><div class="rev-h"><span class="av">${esc(r[0].toUpperCase())}</span>${esc(r)} <span class="c">· ${ds.length} de ${ITEMS.length} revisadas</span></div>
       <div class="tiles"><div class="tile ok"><b>${n.ok}</b><span>Está bien</span></div><div class="tile alto"><b>${n.alto}</b><span>Muy alto</span></div><div class="tile bajo"><b>${n.bajo}</b><span>Muy bajo</span></div></div>
       ${flagged.length?`<div class="tw"><table><thead><tr><th>Partida</th><th>Veredicto</th><th class="n">Rate</th><th class="n">Propone</th><th>Nota</th>${ADMIN?'<th></th>':''}</tr></thead><tbody>
-        ${flagged.map(d=>{ const it=d.it; const sug=d.suggested==null?null:Number(d.suggested); const delta=sug!=null&&it.rate?Math.round(100*(sug-it.rate)/it.rate):null; const applied=sug!=null&&Math.abs(sug-it.rate)<0.005;
-          return `<tr><td><b>${esc(it.service)}</b><br><span style="color:var(--muted);font-size:11.5px">${esc(it.trade)} · por ${esc(it.unit)}</span></td>
+        ${flagged.map(d=>{ const it=d.it; const base=baseVal(it); const sug=d.suggested==null?null:Number(d.suggested); const delta=sug!=null&&base?Math.round(100*(sug-base)/base):null; const applied=sug!=null&&Math.abs(sug-base)<0.005;
+          return `<tr><td><b>${esc(it.service)}</b><br><span style="color:var(--muted);font-size:11.5px">${esc(it.trade)}${isMin(it)?' · minutos':' · por '+esc(it.unit)}</span></td>
           <td><span class="pill ${d.verdict}">${d.verdict==='alto'?'Muy alto':'Muy bajo'}</span></td>
-          <td class="n">$${money(it.rate)}</td>
-          <td class="n">${sug!=null?`<span class="delta">$${money(sug)}</span>${delta!=null?`<br><span style="font-size:11px;color:var(--muted)">${delta>0?'+':''}${delta}%</span>`:''}`:'<span style="color:var(--muted)">—</span>'}</td>
+          <td class="n">${fmtVal(it,base)}</td>
+          <td class="n">${sug!=null?`<span class="delta">${fmtVal(it,sug)}</span>${delta!=null?`<br><span style="font-size:11px;color:var(--muted)">${delta>0?'+':''}${delta}%</span>`:''}`:'<span style="color:var(--muted)">—</span>'}</td>
           <td>${esc(d.note||'')}</td>
           ${ADMIN?`<td>${sug!=null&&!applied?`<button class="btn sm" data-apply="${it.id}" data-rate="${sug}" data-by="${esc(r)}">Aplicar</button>`:applied?'<span class="pill ok">Aplicado</span>':''}</td>`:''}</tr>`; }).join('')}
       </tbody></table></div>`:`<p class="empty">Todo marcado como "está bien".</p>`}
     </div>`;
   }
   $('#summary').innerHTML=html;
-  if(ADMIN) $('#summary').querySelectorAll('[data-apply]').forEach(b=>b.onclick=()=>{ const it=ITEMS.find(x=>x.id===b.dataset.apply); if(confirm(`¿Cambiar "${it.service}" de $${money(it.rate)} a $${money(b.dataset.rate)}?`)) applyRate(b.dataset.apply, Number(b.dataset.rate), 'propuesto por '+b.dataset.by); });
+  if(ADMIN) $('#summary').querySelectorAll('[data-apply]').forEach(b=>b.onclick=()=>{ const it=ITEMS.find(x=>x.id===b.dataset.apply); if(confirm(`¿Cambiar "${it.service}" de ${fmtVal(it,baseVal(it))} a ${fmtVal(it,Number(b.dataset.rate))}?`)) applyRate(b.dataset.apply, Number(b.dataset.rate), 'propuesto por '+b.dataset.by); });
 }
 
 // ---------- share ----------
@@ -419,8 +460,8 @@ function exportText(){
   const lines=[`Revisión catálogo Domo — ${reviewer} — ${new Date().toLocaleDateString('es-PR')}`];
   const c=counts(); lines.push(`${c.done}/${c.total} partidas revisadas`,'');
   for(const it of ITEMS){ const a=answers[it.id]; if(!a?.verdict) continue;
-    let l=`${it.id} · ${it.service} · $${money(it.rate)}/${it.unit} → ${a.verdict.toUpperCase()}`;
-    if(a.suggested!=null) l+=` $${money(a.suggested)}`; if(a.note) l+=` · "${a.note}"`; lines.push(l); }
+    let l=`${it.id} · ${it.service} · ${isMin(it)?it.minutes+' min':'$'+money(it.rate)+'/'+it.unit} → ${a.verdict.toUpperCase()}`;
+    if(a.suggested!=null) l+=` ${fmtVal(it,a.suggested)}`; if(a.note) l+=` · "${a.note}"`; lines.push(l); }
   return lines.join('\n');
 }
 function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
