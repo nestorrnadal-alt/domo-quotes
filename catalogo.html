@@ -216,7 +216,7 @@ const ls = { get(k){ try{return JSON.parse(localStorage.getItem(k))}catch(_){ret
 
 let ITEMS = [], TRADES = [];                 // from catalog_items
 const WAVES = {1:'Ahora · Tareas de la visita (minutos)', 2:'Después · Pintura, Empañetado, Albañilería', 3:'Plomería', 4:'Eléctrico', 5:'Impermeabilización', 9:'Más adelante'};
-const isMin = it => it.minutes != null;      // visit tasks are reviewed in minutes, not $
+const isMin = it => Number(it.review_wave ?? it.wave) === 1;   // visit tasks (wave 1) are reviewed in minutes, not $; project items carry minutes too, as a duration hint
 let showLater = false;
 let reviewer = (new URLSearchParams(location.search).get('r') || ls.get('rev.name') || '').trim();
 const ADMIN = /^(nestor|néstor)$/i.test(reviewer) || new URLSearchParams(location.search).has('admin');
@@ -332,7 +332,7 @@ function itemCard(it){
         <div class="i-meta">${mn?`<span>tiempo estimado</span>${it.complexity_flag?'<span class="flag">+$100 complejo</span>':''}`:`<span>por <b>${esc(it.unit)}</b></span><span class="basis ${bc}">${bl}</span>`}</div></div>
       <div class="i-rate">${mn?`<b>⏱ ${it.minutes}</b><span>minutos</span>`:`<b>$${money(it.rate)}</b><span>/ ${esc(it.unit)}</span>`}</div>
     </div>
-    ${mn?'':`<div class="mult">${multTxt(it)}</div>`}
+    ${mn?'':`<div class="mult">${it.minutes!=null?`⏱ <b>${it.minutes>=60?(it.minutes/60).toFixed(it.minutes%60?1:0)+' h':it.minutes+' min'}</b> de labor por ${esc(it.unit)} &nbsp;·&nbsp; `:''}${multTxt(it)}</div>`}
     ${it.note?`<div class="note">${esc(it.note)}</div>`:''}
     <div class="seg" role="group" aria-label="Veredicto">
       <button type="button" class="v-ok" data-v="ok" aria-pressed="${v==='ok'}">👍 Está bien<small>déjalo así</small></button>
